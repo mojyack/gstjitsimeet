@@ -23,9 +23,10 @@ struct GstJitsiBin {
     GstPad* sink;
     GstPad* src;
 
-    std::unique_ptr<GstJingleHandler>       jingle_handler;
-    std::unique_ptr<conference::Conference> conference;
-    ws::Connection*                         ws_conn;
+    std::unique_ptr<GstJingleHandler>                jingle_handler;
+    std::unique_ptr<conference::ConferenceCallbacks> conference_callbacks;
+    std::unique_ptr<conference::Conference>          conference;
+    ws::Connection*                                  ws_conn;
 };
 
 struct GstJitsiBinClass {

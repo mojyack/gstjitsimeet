@@ -4,7 +4,6 @@
 
 #include "ice.hpp"
 #include "jitsi/array-util.hpp"
-#include "jitsi/jingle-handler.hpp"
 #include "jitsi/xmpp/extdisco.hpp"
 #include "jitsi/xmpp/jid.hpp"
 #include "util/event.hpp"
@@ -69,7 +68,7 @@ struct JingleSession {
     auto find_codec_by_tx_pt(int tx_pt) const -> const Codec*;
 };
 
-class GstJingleHandler : public JingleHandler {
+class GstJingleHandler {
   private:
     Event*                         sync;
     CodecType                      audio_codec_type;
@@ -81,9 +80,8 @@ class GstJingleHandler : public JingleHandler {
   public:
     auto get_session() const -> const JingleSession&;
     auto build_accept_jingle() const -> std::optional<jingle::Jingle>;
-
-    auto initiate(jingle::Jingle jingle) -> bool override;
-    auto add_source(jingle::Jingle jingle) -> bool override;
+    auto on_initiate(jingle::Jingle jingle) -> bool;
+    auto on_add_source(jingle::Jingle jingle) -> bool;
 
     GstJingleHandler(CodecType                      audio_codec_type,
                      CodecType                      video_codec_type,

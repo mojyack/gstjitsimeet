@@ -463,6 +463,31 @@ auto construct_sub_pipeline(GstJitsiBin& self, const CodecType audio_codec_type,
 
     return true;
 }
+
+struct ConferenceCallbacks : public conference::ConferenceCallbacks {
+    ws::Connection*   ws_conn;
+    GstJingleHandler* jingle_handler;
+
+    virtual auto send_payload(std::string_view payload) -> void override {
+        ws::send_str(ws_conn, payload);
+    }
+
+    virtual auto on_jingle_initiate(jingle::Jingle jingle) -> bool override {
+        return jingle_handler->on_initiate(std::move(jingle));
+    }
+
+    virtual auto on_jingle_add_source(jingle::Jingle jingle) -> bool override {
+        return jingle_handler->on_add_source(std::move(jingle));
+    }
+
+    virtual auto on_participant_joined(const conference::Participant& participant) -> void override {
+        print("partitipant joined ", participant.participant_id, " ", participant.nick);
+    }
+
+    virtual auto on_participant_left(const conference::Participant& participant) -> void override {
+        print("partitipant left ", participant.participant_id, " ", participant.nick);
+    }
+};
 } // namespace
 
 auto gst_jitsibin_init(GstJitsiBin* jitsibin) -> void {
@@ -474,7 +499,7 @@ auto gst_jitsibin_init(GstJitsiBin* jitsibin) -> void {
     constexpr auto video_codec_type = CodecType::H264; // TODO
 
     constexpr auto host = "jitsi.local";
-    constexpr auto room = "sink1";
+    constexpr auto room = "room";
     self.ws_conn        = ws::connect(host, (std::string("xmpp-websocket?room=") + room).data());
 
     auto ws_tx = [&self](const std::string_view str) {
@@ -504,18 +529,16 @@ auto gst_jitsibin_init(GstJitsiBin* jitsibin) -> void {
         ext_sv   = std::move(res.external_services);
     }
     event.clear();
+
     const auto jingle_handler = new GstJingleHandler(audio_codec_type, video_codec_type, jid, ext_sv, &event);
     new(&self.jingle_handler) std::unique_ptr<GstJingleHandler>(jingle_handler);
     // join to conference
-    new(&self.conference) std::unique_ptr<conference::Conference>(conference::Conference::create(room, jid));
-    self.conference->jingle_handler        = jingle_handler;
-    self.conference->send_payload          = ws_tx;
-    self.conference->on_participant_joined = [](const conference::Participant& p) -> void {
-        PRINT("partitipant joined ", p.participant_id, " ", p.nick);
-    };
-    self.conference->on_participant_left = [](const conference::Participant& p) -> void {
-        PRINT("partitipant left ", p.participant_id, " ", p.nick);
-    };
+    const auto callbacks      = new ConferenceCallbacks();
+    callbacks->ws_conn        = self.ws_conn;
+    callbacks->jingle_handler = jingle_handler;
+    new(&self.conference_callbacks) std::unique_ptr<conference::ConferenceCallbacks>();
+    new(&self.conference) std::unique_ptr<conference::Conference>(
+        conference::Conference::create(room, jid, callbacks));
     ws::add_rx(self.ws_conn, [&self, &event](const std::span<std::byte> data) -> ws::RxResult {
         const auto done = self.conference->feed_payload(std::string_view((char*)data.data(), data.size()));
         if(done) {

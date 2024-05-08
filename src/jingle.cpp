@@ -279,7 +279,7 @@ auto GstJingleHandler::build_accept_jingle() const -> std::optional<jingle::Jing
     return accept;
 }
 
-auto GstJingleHandler::initiate(jingle::Jingle jingle) -> bool {
+auto GstJingleHandler::on_initiate(jingle::Jingle jingle) -> bool {
     auto codecs                        = std::vector<Codec>();
     auto ssrc_map                      = SSRCMap();
     auto video_hdrext_transport_cc     = -1;
@@ -346,7 +346,7 @@ auto GstJingleHandler::initiate(jingle::Jingle jingle) -> bool {
     return true;
 }
 
-auto GstJingleHandler::add_source(jingle::Jingle jingle) -> bool {
+auto GstJingleHandler::on_add_source(jingle::Jingle jingle) -> bool {
     for(const auto& c : jingle.contents) {
         for(const auto& desc : c.descriptions) {
             auto type = SourceType();
