@@ -1,0 +1,3 @@
+[submodule "submodules/libjitsimeet"]
+	path = submodules/libjitsimeet
+	url = https://github.com/mojyack/libjitsimeet.git
