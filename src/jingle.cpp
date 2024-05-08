@@ -310,41 +310,6 @@ auto GstJingleHandler::initiate(jingle::Jingle jingle) -> bool {
     auto       cert_pem        = pem::encode("CERTIFICATE", *cert_der);
     auto       priv_key_pem    = pem::encode("PRIVATE KEY", *priv_key_der);
 
-    /*
-    fingerprint_str = "B1:99:23:24:62:77:5E:7C:02:8D:59:BA:B4:33:CB:22:1A:22:C9:B9:90:2B:A0:1E:31:E0:E9:83:48:66:6D:63";
-    cert_pem        = R"(-----BEGIN CERTIFICATE-----
-MIIBLTCB1QIBATAJBgcqhkjOPQQBMCQxCzAJBgNVBAYTAkpQMRUwEwYDVQQDDAxn
-c3RqaXRzaW1lZXQwHhcNMjQwNTA3MDY1NzEyWhcNMjUwNTA3MDY1NzEyWjAkMQsw
-CQYDVQQGEwJKUDEVMBMGA1UEAwwMZ3N0aml0c2ltZWV0MFkwEwYHKoZIzj0CAQYI
-KoZIzj0DAQcDQgAEeHWO3P5eSD5EzzXtzK4kjA0s4E9GHDfMZP2mbu0XGHbL5D1M
-WkfW06LHK0ab6T2VCvizRjFjl3XKusabTbRBNzAJBgcqhkjOPQQBA0gAMEUCIQD5
-JHZnxGSCvNskSzAs8gi4SrICJ9iwy0HXF5TRoP5TSAIgC/7+wqlz+X0WGInDWaN+
-2WjgSlTU24rtR6A0TCiL9Rw=
------END CERTIFICATE-----)";
-    priv_key_pem    = R"(-----BEGIN PRIVATE KEY-----
-MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQguQUE3fl5MS/8WbgT
-Stgflpk8F1r43tVRDylReQDv87+hRANCAAR4dY7c/l5IPkTPNe3MriSMDSzgT0Yc
-N8xk/aZu7RcYdsvkPUxaR9bToscrRpvpPZUK+LNGMWOXdcq6xptNtEE3
------END PRIVATE KEY-----)";
-
-    fingerprint_str = "CF:CC:1E:43:89:E2:78:0B:AC:4E:88:4C:C6:25:DB:C6:55:21:B7:33:96:B6:AA:DB:49:A5:E2:9C:DF:DC:D0:94";
-    cert_pem        = R"(-----BEGIN CERTIFICATE-----
-MIIBXjCCAQSgAwIBAgIVAOiMAA3l6CKGldBzFqTClT/zHio6MAoGCCqGSM49BAMC
-MCExHzAdBgNVBAMMFnJjZ2VuIHNlbGYgc2lnbmVkIGNlcnQwIBcNNzUwMTAxMDAw
-MDAwWhgPNDA5NjAxMDEwMDAwMDBaMCExHzAdBgNVBAMMFnJjZ2VuIHNlbGYgc2ln
-bmVkIGNlcnQwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAATnP4ii7reH/riG5Dwg
-8dMOyGFmeOxM/DvMwZwBDj4Yh1GAzpgPaN61i31dQuipiSq4+mbFOpHUF/V42uxS
-kJskoxcwFTATBgNVHREEDDAKgghnc3QtbWVldDAKBggqhkjOPQQDAgNIADBFAiEA
-3U75LKiZjwgqf0yJYwn6q/X49a39TegsnIgeDRTFC/YCIAYuPC/jEIL6GHu89mrk
-TNj6UynL7qOEm60f9PLMfnE7
------END CERTIFICATE-----)";
-    priv_key_pem    = R"(-----BEGIN PRIVATE KEY-----
-MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgz6ZUl6WW4haBusYq
-2cDNQ7knkZlPWhUewATbnFYKXHmhRANCAATnP4ii7reH/riG5Dwg8dMOyGFmeOxM
-/DvMwZwBDj4Yh1GAzpgPaN61i31dQuipiSq4+mbFOpHUF/V42uxSkJsk
------END PRIVATE KEY-----)";
-*/
-
     // DEBUG
     printf("%s\n", fingerprint_str.data());
     printf("%s\n", cert_pem.data());
