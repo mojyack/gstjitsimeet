@@ -561,22 +561,34 @@ auto gst_jitsibin_init(GstJitsiBin* jitsibin) -> void {
     // create pipeline based on the jingle information
     DYN_ASSERT(construct_sub_pipeline(self, audio_codec_type, video_codec_type));
     // accept jingle session
-    unwrap_on_mut(accept, jingle_handler->build_accept_jingle());
-    self.conference->send_jingle_accept(std::move(accept));
+    {
+        unwrap_on_mut(accept, jingle_handler->build_accept_jingle());
+        auto accept_iq = xmpp::elm::iq.clone()
+                             .append_attrs({
+                                 {"from", jid.as_full()},
+                                 {"to", self.conference->muc_local_focus_jid.as_full()},
+                                 {"type", "set"},
+                             })
+                             .append_children({
+                                 jingle::deparse(accept),
+                             });
+
+        self.conference->send_iq(std::move(accept_iq), [](bool success) -> void {
+            DYN_ASSERT(success, "failed to send accept iq");
+        });
+    }
 
     static auto pinger = std::thread([jitsibin]() {
         auto count = 0;
         while(true) {
-            const auto id = build_string("ping_", count += 1);
             const auto iq = xmpp::elm::iq.clone()
                                 .append_attrs({
-                                    {"id", id},
                                     {"type", "get"},
                                 })
                                 .append_children({
                                     xmpp::elm::ping,
                                 });
-            ws::send_str(jitsibin->ws_conn, xml::deparse(iq));
+            jitsibin->conference->send_iq(iq, {});
             std::this_thread::sleep_for(std::chrono::seconds(10));
         }
     });
