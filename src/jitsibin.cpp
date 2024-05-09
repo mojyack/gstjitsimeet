@@ -579,7 +579,6 @@ auto gst_jitsibin_init(GstJitsiBin* jitsibin) -> void {
     }
 
     static auto pinger = std::thread([jitsibin]() {
-        auto count = 0;
         while(true) {
             const auto iq = xmpp::elm::iq.clone()
                                 .append_attrs({
