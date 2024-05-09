@@ -12,6 +12,7 @@
 #include "jitsi/util/event.hpp"
 #include "jitsi/util/misc.hpp"
 #include "jitsi/xmpp/connection.hpp"
+#include "jitsi/xmpp/elements.hpp"
 #include "jitsibin.hpp"
 
 #define GST_CAT_DEFAULT jitsibin_debug
@@ -568,13 +569,19 @@ auto gst_jitsibin_init(GstJitsiBin* jitsibin) -> void {
     self.conference->send_jingle_accept(std::move(accept));
 
     static auto pinger = std::thread([jitsibin]() {
-        auto count = 1;
+        auto count = 0;
         while(true) {
-            const auto payload = build_string(R"(<iq xmlns='jabber:client' id=")", "ping_",
-                                              count += 1,
-                                              R"(" type="get"><ping xmlns='urn:xmpp:ping'/></iq>)");
-            ws::send_str(jitsibin->ws_conn, payload);
-            std::this_thread::sleep_for(std::chrono::seconds(5));
+            const auto id = build_string("ping_", count += 1);
+            const auto iq = xmpp::elm::iq.clone()
+                                .append_attrs({
+                                    {"id", id},
+                                    {"type", "get"},
+                                })
+                                .append_children({
+                                    xmpp::elm::ping,
+                                });
+            ws::send_str(jitsibin->ws_conn, xml::deparse(iq));
+            std::this_thread::sleep_for(std::chrono::seconds(10));
         }
     });
 
