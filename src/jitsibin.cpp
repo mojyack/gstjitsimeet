@@ -464,6 +464,14 @@ auto construct_sub_pipeline(GstJitsiBin& self, const CodecType audio_codec_type,
     return true;
 }
 
+struct XMPPNegotiatorCallbacks : public xmpp::NegotiatorCallbacks {
+    ws::Connection* ws_conn;
+
+    virtual auto send_payload(std::string_view payload) -> void override {
+        ws::send_str(ws_conn, payload);
+    }
+};
+
 struct ConferenceCallbacks : public conference::ConferenceCallbacks {
     ws::Connection* ws_conn;
     JingleHandler*  jingle_handler;
@@ -498,35 +506,35 @@ auto gst_jitsibin_init(GstJitsiBin* jitsibin) -> void {
     constexpr auto audio_codec_type = CodecType::Opus;
     constexpr auto video_codec_type = CodecType::H264; // TODO
 
-    constexpr auto host = "jitsi.local";
-    constexpr auto room = "room";
-    self.ws_conn        = ws::connect(host, (std::string("xmpp-websocket?room=") + room).data());
-
-    auto ws_tx = [&self](const std::string_view str) {
-        ws::send_str(self.ws_conn, str);
-    };
+    constexpr auto host    = "jitsi.local";
+    constexpr auto room    = "room";
+    const auto     ws_path = std::string("xmpp-websocket?room=") + room;
+    self.ws_conn           = ws::create_connection(host, ws_path.data(), false); // DEBUG: enable secure connection
 
     auto event  = Event();
     auto jid    = xmpp::Jid();
     auto ext_sv = std::vector<xmpp::Service>();
 
-    // connect to server
+    // gain jid from server
     {
-        const auto xmpp_conn = xmpp::create(host, ws_tx);
-        ws::add_rx(self.ws_conn, [xmpp_conn, &event](const std::span<std::byte> data) -> ws::RxResult {
-            const auto done = xmpp::resume_negotiation(xmpp_conn, std::string_view((char*)data.data(), data.size()));
+        auto callbacks        = XMPPNegotiatorCallbacks();
+        callbacks.ws_conn     = self.ws_conn;
+        const auto negotiator = xmpp::Negotiator::create(host, &callbacks);
+        ws::add_receiver(self.ws_conn, [&negotiator, &event](const std::span<std::byte> data) -> ws::ReceiverResult {
+            const auto payload = std::string_view(std::bit_cast<char*>(data.data()), data.size());
+            const auto done    = negotiator->feed_payload(payload);
             if(done) {
                 event.wakeup();
-                return ws::RxResult::Complete;
+                return ws::ReceiverResult::Complete;
+            } else {
+                return ws::ReceiverResult::Handled;
             }
-            return ws::RxResult::Handled;
         });
-        xmpp::start_negotiation(xmpp_conn);
+        negotiator->start_negotiation();
         event.wait();
 
-        auto res = xmpp::finish(xmpp_conn);
-        jid      = std::move(res.jid);
-        ext_sv   = std::move(res.external_services);
+        jid    = std::move(negotiator->jid);
+        ext_sv = std::move(negotiator->external_services);
     }
     event.clear();
 
@@ -539,13 +547,14 @@ auto gst_jitsibin_init(GstJitsiBin* jitsibin) -> void {
     new(&self.conference_callbacks) std::unique_ptr<conference::ConferenceCallbacks>();
     new(&self.conference) std::unique_ptr<conference::Conference>(
         conference::Conference::create(room, jid, callbacks));
-    ws::add_rx(self.ws_conn, [&self, &event](const std::span<std::byte> data) -> ws::RxResult {
+    ws::add_receiver(self.ws_conn, [&self, &event](const std::span<std::byte> data) -> ws::ReceiverResult {
         const auto done = self.conference->feed_payload(std::string_view((char*)data.data(), data.size()));
         if(done) {
             event.wakeup();
-            return ws::RxResult::Complete;
+            return ws::ReceiverResult::Complete;
+        } else {
+            return ws::ReceiverResult::Handled;
         }
-        return ws::RxResult::Handled;
     });
     self.conference->start_negotiation();
     // wait for jingle initiation
