@@ -6,7 +6,7 @@
 #include <gst/rtp/gstrtphdrext.h>
 
 #include "auto-gst-object.hpp"
-#include "autoptr.hpp"
+#include "jitsi/autoptr.hpp"
 #include "jitsi/unwrap.hpp"
 #include "jitsi/util/charconv.hpp"
 #include "jitsi/util/event.hpp"
@@ -465,8 +465,8 @@ auto construct_sub_pipeline(GstJitsiBin& self, const CodecType audio_codec_type,
 }
 
 struct ConferenceCallbacks : public conference::ConferenceCallbacks {
-    ws::Connection*   ws_conn;
-    GstJingleHandler* jingle_handler;
+    ws::Connection* ws_conn;
+    JingleHandler*  jingle_handler;
 
     virtual auto send_payload(std::string_view payload) -> void override {
         ws::send_str(ws_conn, payload);
@@ -530,8 +530,8 @@ auto gst_jitsibin_init(GstJitsiBin* jitsibin) -> void {
     }
     event.clear();
 
-    const auto jingle_handler = new GstJingleHandler(audio_codec_type, video_codec_type, jid, ext_sv, &event);
-    new(&self.jingle_handler) std::unique_ptr<GstJingleHandler>(jingle_handler);
+    const auto jingle_handler = new JingleHandler(audio_codec_type, video_codec_type, jid, ext_sv, &event);
+    new(&self.jingle_handler) std::unique_ptr<JingleHandler>(jingle_handler);
     // join to conference
     const auto callbacks      = new ConferenceCallbacks();
     callbacks->ws_conn        = self.ws_conn;

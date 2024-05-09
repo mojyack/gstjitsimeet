@@ -6,17 +6,11 @@ deps = [
   dependency('gstreamer-rtp-1.0'),
   dependency('threads'),
   dependency('openssl'),
-  dependency('nice'),
 ]
 
 src = files(
   'src/lib.cpp',
   'src/jitsibin.cpp',
-  'src/jingle.cpp',
-  'src/cert.cpp',
-  'src/pem.cpp',
-  'src/hostaddr.cpp',
-  'src/ice.cpp',
 )
 
 subdir('src/jitsi')

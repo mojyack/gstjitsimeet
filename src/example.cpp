@@ -2,7 +2,7 @@
 #include <gst/video/gstvideodecoder.h>
 
 #include "auto-gst-object.hpp"
-#include "autoptr.hpp"
+#include "jitsi/autoptr.hpp"
 #include "jitsi/unwrap.hpp"
 #include "util/charconv.hpp"
 #include "util/misc.hpp"

@@ -1,8 +1,8 @@
 #pragma once
 #include <gst/gst.h>
 
-#include "jingle.hpp"
 #include "jitsi/conference.hpp"
+#include "jitsi/jingle-handler/jingle.hpp"
 #include "jitsi/websocket.hpp"
 
 extern "C" {
@@ -23,7 +23,7 @@ struct GstJitsiBin {
     GstPad* sink;
     GstPad* src;
 
-    std::unique_ptr<GstJingleHandler>                jingle_handler;
+    std::unique_ptr<JingleHandler>                   jingle_handler;
     std::unique_ptr<conference::ConferenceCallbacks> conference_callbacks;
     std::unique_ptr<conference::Conference>          conference;
     ws::Connection*                                  ws_conn;
