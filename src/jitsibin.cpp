@@ -11,8 +11,8 @@
 #include "jitsi/util/charconv.hpp"
 #include "jitsi/util/event.hpp"
 #include "jitsi/util/misc.hpp"
-#include "jitsi/xmpp/connection.hpp"
 #include "jitsi/xmpp/elements.hpp"
+#include "jitsi/xmpp/negotiator.hpp"
 #include "jitsibin.hpp"
 
 #define GST_CAT_DEFAULT jitsibin_debug
@@ -548,14 +548,10 @@ auto gst_jitsibin_init(GstJitsiBin* jitsibin) -> void {
     new(&self.conference_callbacks) std::unique_ptr<conference::ConferenceCallbacks>();
     new(&self.conference) std::unique_ptr<conference::Conference>(
         conference::Conference::create(room, jid, callbacks));
-    ws::add_receiver(self.ws_conn, [&self, &event](const std::span<std::byte> data) -> ws::ReceiverResult {
-        const auto done = self.conference->feed_payload(std::string_view((char*)data.data(), data.size()));
-        if(done) {
-            event.wakeup();
-            return ws::ReceiverResult::Complete;
-        } else {
-            return ws::ReceiverResult::Handled;
-        }
+    ws::add_receiver(self.ws_conn, [&self](const std::span<std::byte> data) -> ws::ReceiverResult {
+        // feed_payload always returns true in current implementation
+        self.conference->feed_payload(std::string_view((char*)data.data(), data.size()));
+        return ws::ReceiverResult::Handled;
     });
     self.conference->start_negotiation();
     // wait for jingle initiation
