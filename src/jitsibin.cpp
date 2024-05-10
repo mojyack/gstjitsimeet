@@ -30,6 +30,8 @@ struct RealSelf {
     std::unique_ptr<conference::ConferenceCallbacks> conference_callbacks;
     std::unique_ptr<conference::Conference>          conference;
     std::thread                                      pinger;
+    xmpp::Jid                                        jid;
+    Event                                            session_initiate_jingle_arrived_event;
 };
 
 namespace {
@@ -476,6 +478,46 @@ auto construct_sub_pipeline(RealSelf& self, const CodecType audio_codec_type, co
     return true;
 }
 
+auto wait_for_jingle_and_setup_pipeline(RealSelf& self, const CodecType audio_codec_type, const CodecType video_codec_type) -> bool {
+    // wait for jingle initiation
+    self.session_initiate_jingle_arrived_event.wait();
+    // create pipeline based on the jingle information
+    PRINT("creating pipeline");
+    DYN_ASSERT(construct_sub_pipeline(self, audio_codec_type, video_codec_type));
+    // accept jingle session
+    unwrap_ob_mut(accept, self.jingle_handler->build_accept_jingle());
+    const auto accept_iq = xmpp::elm::iq.clone()
+                               .append_attrs({
+                                   {"from", self.jid.as_full()},
+                                   {"to", self.conference->muc_local_focus_jid.as_full()},
+                                   {"type", "set"},
+                               })
+                               .append_children({
+                                   jingle::deparse(accept),
+                               });
+
+    self.conference->send_iq(std::move(accept_iq), [](bool success) -> void {
+        DYN_ASSERT(success, "failed to send accept iq");
+    });
+
+    // launch ping thread
+    self.pinger = std::thread([&self]() {
+        while(true) {
+            const auto iq = xmpp::elm::iq.clone()
+                                .append_attrs({
+                                    {"type", "get"},
+                                })
+                                .append_children({
+                                    xmpp::elm::ping,
+                                });
+            self.conference->send_iq(iq, {});
+            std::this_thread::sleep_for(std::chrono::seconds(10));
+        }
+    });
+
+    return true;
+}
+
 struct XMPPNegotiatorCallbacks : public xmpp::NegotiatorCallbacks {
     ws::Connection* ws_conn;
 
@@ -526,90 +568,47 @@ auto gst_jitsibin_init(GstJitsiBin* jitsibin) -> void {
     const auto     ws_path = std::string("xmpp-websocket?room=") + room;
     self.ws_conn           = ws::create_connection(host, ws_path.data(), false); // DEBUG: enable secure connection
 
-    auto event  = Event();
-    auto jid    = xmpp::Jid();
     auto ext_sv = std::vector<xmpp::Service>();
 
     // gain jid from server
     {
-        auto callbacks        = XMPPNegotiatorCallbacks();
-        callbacks.ws_conn     = self.ws_conn;
-        const auto negotiator = xmpp::Negotiator::create(host, &callbacks);
-        ws::add_receiver(self.ws_conn, [&negotiator, &event](const std::span<std::byte> data) -> ws::ReceiverResult {
+        auto negotiate_done_event = Event();
+        auto callbacks            = XMPPNegotiatorCallbacks();
+        callbacks.ws_conn         = self.ws_conn;
+        const auto negotiator     = xmpp::Negotiator::create(host, &callbacks);
+        ws::add_receiver(self.ws_conn, [&negotiator, &negotiate_done_event](const std::span<std::byte> data) -> ws::ReceiverResult {
             const auto payload = std::string_view(std::bit_cast<char*>(data.data()), data.size());
             const auto done    = negotiator->feed_payload(payload);
             if(done) {
-                event.wakeup();
+                negotiate_done_event.wakeup();
                 return ws::ReceiverResult::Complete;
             } else {
                 return ws::ReceiverResult::Handled;
             }
         });
         negotiator->start_negotiation();
-        event.wait();
+        negotiate_done_event.wait();
 
-        jid    = std::move(negotiator->jid);
-        ext_sv = std::move(negotiator->external_services);
+        self.jid = std::move(negotiator->jid);
+        ext_sv   = std::move(negotiator->external_services);
     }
-    event.clear();
 
-    const auto jingle_handler = new JingleHandler(audio_codec_type, video_codec_type, jid, ext_sv, &event);
+    const auto jingle_handler = new JingleHandler(audio_codec_type, video_codec_type, self.jid, ext_sv, &self.session_initiate_jingle_arrived_event);
     self.jingle_handler.reset(jingle_handler);
     // join to conference
     const auto callbacks      = new ConferenceCallbacks();
     callbacks->ws_conn        = self.ws_conn;
     callbacks->jingle_handler = jingle_handler;
     self.conference_callbacks.reset(callbacks);
-    self.conference = conference::Conference::create(room, jid, callbacks);
+    self.conference = conference::Conference::create(room, self.jid, callbacks);
     ws::add_receiver(self.ws_conn, [&self](const std::span<std::byte> data) -> ws::ReceiverResult {
         // feed_payload always returns true in current implementation
         self.conference->feed_payload(std::string_view((char*)data.data(), data.size()));
         return ws::ReceiverResult::Handled;
     });
     self.conference->start_negotiation();
-    // wait for jingle initiation
-    event.wait();
-    event.clear();
-    PRINT("creating pipeline");
-    // create pipeline based on the jingle information
-    DYN_ASSERT(construct_sub_pipeline(self, audio_codec_type, video_codec_type));
-    // accept jingle session
-    {
-        unwrap_on_mut(accept, jingle_handler->build_accept_jingle());
-        auto accept_iq = xmpp::elm::iq.clone()
-                             .append_attrs({
-                                 {"from", jid.as_full()},
-                                 {"to", self.conference->muc_local_focus_jid.as_full()},
-                                 {"type", "set"},
-                             })
-                             .append_children({
-                                 jingle::deparse(accept),
-                             });
-
-        self.conference->send_iq(std::move(accept_iq), [](bool success) -> void {
-            DYN_ASSERT(success, "failed to send accept iq");
-        });
-    }
-
-    self.pinger = std::thread([&self]() {
-        while(true) {
-            const auto iq = xmpp::elm::iq.clone()
-                                .append_attrs({
-                                    {"type", "get"},
-                                })
-                                .append_children({
-                                    xmpp::elm::ping,
-                                });
-            self.conference->send_iq(iq, {});
-            std::this_thread::sleep_for(std::chrono::seconds(10));
-        }
-    });
-
+    wait_for_jingle_and_setup_pipeline(self, audio_codec_type, video_codec_type);
     return;
-    while(true) {
-        event.clear();
-        event.wait();
-    }
 }
 
 auto gst_jitsibin_finalize(GObject* object) -> void {
