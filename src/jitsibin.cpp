@@ -543,11 +543,11 @@ struct ConferenceCallbacks : public conference::ConferenceCallbacks {
     }
 
     virtual auto on_participant_joined(const conference::Participant& participant) -> void override {
-        print("partitipant joined ", participant.participant_id, " ", participant.nick);
+        print("participant joined ", participant.participant_id, " ", participant.nick);
     }
 
     virtual auto on_participant_left(const conference::Participant& participant) -> void override {
-        print("partitipant left ", participant.participant_id, " ", participant.nick);
+        print("participant left ", participant.participant_id, " ", participant.nick);
     }
 };
 } // namespace
