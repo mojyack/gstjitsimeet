@@ -31,7 +31,17 @@ struct RealSelf {
     std::unique_ptr<conference::Conference>          conference;
     std::thread                                      pinger;
     xmpp::Jid                                        jid;
+    std::vector<xmpp::Service>                       extenal_services;
     Event                                            session_initiate_jingle_arrived_event;
+
+    // for unblocking setup
+    GstPad*     sink_pad;
+    GstElement* stub_sink;
+    GstElement* real_sink;
+    std::thread session_initiate_jingle_wait_thread;
+
+    // props
+    bool async_sink = true;
 };
 
 namespace {
@@ -385,7 +395,7 @@ auto construct_sub_pipeline(RealSelf& self, const CodecType audio_codec_type, co
 
     // dtlssrtpdec
     const auto dtlssrtpdec = gst_element_factory_make("dtlssrtpdec", NULL);
-    assert_b(dtlssrtpenc != NULL, "failed to create dtlssrtpdec");
+    assert_b(dtlssrtpdec != NULL, "failed to create dtlssrtpdec");
     g_object_set(dtlssrtpdec,
                  "connection-id", dtls_conn_id.data(),
                  "pem", (jingle_session.dtls_cert_pem + "\n" + jingle_session.dtls_priv_key_pem).data(),
@@ -470,21 +480,82 @@ auto construct_sub_pipeline(RealSelf& self, const CodecType audio_codec_type, co
     assert_b(gst_element_link_pads(nicesrc, NULL, dtlssrtpdec, NULL) == TRUE);
     assert_b(gst_element_link_pads(dtlssrtpenc, "src", nicesink, "sink") == TRUE);
 
-    // expose sink pad
-    unwrap_pb_mut(video_pay_sink, gst_element_get_static_pad(video_pay, "sink"));
-    unwrap_pb_mut(jitsibin_sink, gst_ghost_pad_new("sink", &video_pay_sink));
-    assert_b(gst_element_add_pad(GST_ELEMENT(self.bin), &jitsibin_sink) == TRUE);
+    self.real_sink = video_pay;
 
+    return true;
+}
+
+auto replace_stub_sink_with_real_sink(RealSelf& self, bool callbacked = false) -> bool;
+
+auto jitsibin_sink_block_callback(GstPad* const pad, GstPadProbeInfo* const info, gpointer const data) -> GstPadProbeReturn {
+    auto& self = *std::bit_cast<RealSelf*>(data);
+    replace_stub_sink_with_real_sink(self, true);
+    return GST_PAD_PROBE_REMOVE;
+}
+
+auto replace_stub_sink_with_real_sink(RealSelf& self, bool callbacked) -> bool {
+    if(!callbacked) {
+        // real work must be done in the pad block callback
+        gst_pad_add_probe(self.sink_pad, GST_PAD_PROBE_TYPE_BLOCK_DOWNSTREAM, jitsibin_sink_block_callback, &self, NULL);
+        return true;
+    }
+
+    // now the sink pad is in blocked state, safe to modify.
+
+    // remove stub sink
+    assert_b(gst_element_set_state(self.stub_sink, GST_STATE_NULL) == GST_STATE_CHANGE_SUCCESS);
+    assert_b(call_vfunc(self, remove_element, self.stub_sink) == TRUE);
+    self.stub_sink = nullptr;
+
+    // link real sink to ghostpad
+    const auto target_sink_pad = AutoGstObject(gst_element_get_static_pad(self.real_sink, "sink"));
+    assert_b(target_sink_pad.get() != NULL);
+    gst_ghost_pad_set_target(GST_GHOST_PAD(self.sink_pad), target_sink_pad.get());
+
+    // sync state
+    assert_b(gst_bin_sync_children_states(self.bin) == TRUE);
+
+    return true;
+}
+
+auto setup_stub_pipeline(RealSelf& self) -> bool {
+    auto fakesink = gst_element_factory_make("fakesink", NULL);
+    assert_b(fakesink != NULL, "failed to create fakesink");
+    g_object_set(fakesink,
+                 "async", FALSE,
+                 NULL);
+    assert_b(call_vfunc(self, add_element, fakesink) == TRUE);
+
+    // expose sink pad
+    unwrap_pb_mut(fakesink_sink, gst_element_get_static_pad(fakesink, "sink"));
+    unwrap_pb_mut(jitsibin_sink, gst_ghost_pad_new("sink", &fakesink_sink));
+    assert_b(gst_element_add_pad(GST_ELEMENT(self.bin), &jitsibin_sink) == TRUE);
+    self.stub_sink = fakesink;
+    self.sink_pad  = &jitsibin_sink;
     return true;
 }
 
 auto wait_for_jingle_and_setup_pipeline(RealSelf& self, const CodecType audio_codec_type, const CodecType video_codec_type) -> bool {
     // wait for jingle initiation
     self.session_initiate_jingle_arrived_event.wait();
+
     // create pipeline based on the jingle information
     PRINT("creating pipeline");
     DYN_ASSERT(construct_sub_pipeline(self, audio_codec_type, video_codec_type));
-    // accept jingle session
+
+    // expose real pipeline
+    if(self.async_sink) {
+        // ghostpad already created in setup_stub_pipeline, just replace stub sink with real sink
+        replace_stub_sink_with_real_sink(self);
+    } else {
+        // create ghostpad and link with real sink
+        const auto real_sink_pad = AutoGstObject(gst_element_get_static_pad(self.real_sink, "sink"));
+        assert_b(real_sink_pad.get() != NULL);
+        unwrap_pb_mut(jitsibin_sink, gst_ghost_pad_new("sink", real_sink_pad.get()));
+        assert_b(gst_element_add_pad(GST_ELEMENT(self.bin), &jitsibin_sink) == TRUE);
+    }
+
+    // send jingle accept
     unwrap_ob_mut(accept, self.jingle_handler->build_accept_jingle());
     const auto accept_iq = xmpp::elm::iq.clone()
                                .append_attrs({
@@ -568,8 +639,6 @@ auto gst_jitsibin_init(GstJitsiBin* jitsibin) -> void {
     const auto     ws_path = std::string("xmpp-websocket?room=") + room;
     self.ws_conn           = ws::create_connection(host, ws_path.data(), false); // DEBUG: enable secure connection
 
-    auto ext_sv = std::vector<xmpp::Service>();
-
     // gain jid from server
     {
         auto negotiate_done_event = Event();
@@ -589,12 +658,17 @@ auto gst_jitsibin_init(GstJitsiBin* jitsibin) -> void {
         negotiator->start_negotiation();
         negotiate_done_event.wait();
 
-        self.jid = std::move(negotiator->jid);
-        ext_sv   = std::move(negotiator->external_services);
+        self.jid              = std::move(negotiator->jid);
+        self.extenal_services = std::move(negotiator->external_services);
     }
 
-    const auto jingle_handler = new JingleHandler(audio_codec_type, video_codec_type, self.jid, ext_sv, &self.session_initiate_jingle_arrived_event);
+    const auto jingle_handler = new JingleHandler(audio_codec_type,
+                                                  video_codec_type,
+                                                  self.jid,
+                                                  self.extenal_services,
+                                                  &self.session_initiate_jingle_arrived_event);
     self.jingle_handler.reset(jingle_handler);
+
     // join to conference
     const auto callbacks      = new ConferenceCallbacks();
     callbacks->ws_conn        = self.ws_conn;
@@ -607,7 +681,20 @@ auto gst_jitsibin_init(GstJitsiBin* jitsibin) -> void {
         return ws::ReceiverResult::Handled;
     });
     self.conference->start_negotiation();
-    wait_for_jingle_and_setup_pipeline(self, audio_codec_type, video_codec_type);
+
+    /*
+     * if there are no participants in the conference, jicofo does not send session-initiate jingle.
+     * therefore, wait_for_jingle_and_setup_pipeline is a blocking function.
+     */
+    if(self.async_sink) {
+        assert_n(setup_stub_pipeline(self));
+        // wait for jingle in another thread, in order to avoid blocking entire pipeline.
+        self.session_initiate_jingle_wait_thread = std::thread([&self, audio_codec_type, video_codec_type]() {
+            wait_for_jingle_and_setup_pipeline(self, audio_codec_type, video_codec_type);
+        });
+    } else {
+        wait_for_jingle_and_setup_pipeline(self, audio_codec_type, video_codec_type);
+    }
     return;
 }
 
