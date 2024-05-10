@@ -98,7 +98,6 @@ auto jitsibin_pad_removed_handler(GstElement* const jitisbin, GstPad* const pad,
 }
 
 auto run_pipeline(GstElement* pipeline) -> bool {
-    const auto ret = gst_element_set_state(pipeline, GST_STATE_PLAYING);
     assert_b(gst_element_set_state(pipeline, GST_STATE_PLAYING) == GST_STATE_CHANGE_SUCCESS);
 
     const auto bus = AutoGstObject(gst_element_get_bus(pipeline));
@@ -138,16 +137,29 @@ auto run() -> bool {
         .pipeline = pipeline.get(),
     };
 
+    /*
+     * videotestsrc -> tee -> waylandsink
+     *                     -> videoconvert -> x264enc -> jitisbin
+     */
+
     unwrap_pb_mut(videotestsrc, add_new_element_to_pipeine(pipeline.get(), "videotestsrc"));
+    unwrap_pb_mut(tee, add_new_element_to_pipeine(pipeline.get(), "tee"));
+    unwrap_pb_mut(waylandsink, add_new_element_to_pipeine(pipeline.get(), "waylandsink"));
+    unwrap_pb_mut(videoconvert, add_new_element_to_pipeine(pipeline.get(), "videoconvert"));
     unwrap_pb_mut(x264enc, add_new_element_to_pipeine(pipeline.get(), "x264enc"));
     unwrap_pb_mut(jitsibin, add_new_element_to_pipeine(pipeline.get(), "jitsibin"));
     g_signal_connect(&jitsibin, "pad-added", G_CALLBACK(jitsibin_pad_added_handler), &context);
     g_signal_connect(&jitsibin, "pad-removed", G_CALLBACK(jitsibin_pad_removed_handler), &context);
 
-    assert_b(gst_element_link_pads(&videotestsrc, NULL, &x264enc, NULL) == TRUE);
-    assert_b(gst_element_link_pads(&x264enc, NULL, &jitsibin, NULL) == TRUE);
+    g_object_set(&waylandsink,
+                 "async", FALSE,
+                 NULL);
 
-    assert_b(gst_element_set_state(pipeline.get(), GST_STATE_PLAYING) == GST_STATE_CHANGE_SUCCESS);
+    assert_b(gst_element_link_pads(&videotestsrc, NULL, &tee, NULL) == TRUE);
+    assert_b(gst_element_link_pads(&tee, NULL, &waylandsink, NULL) == TRUE);
+    assert_b(gst_element_link_pads(&tee, NULL, &videoconvert, NULL) == TRUE);
+    assert_b(gst_element_link_pads(&videoconvert, NULL, &x264enc, NULL) == TRUE);
+    assert_b(gst_element_link_pads(&x264enc, NULL, &jitsibin, NULL) == TRUE);
 
     return run_pipeline(pipeline.get());
 }
