@@ -25,10 +25,11 @@ G_DEFINE_TYPE(GstJitsiBin, gst_jitsibin, GST_TYPE_BIN);
 
 struct RealSelf {
     GstBin*                                          bin;
+    ws::Connection*                                  ws_conn;
     std::unique_ptr<JingleHandler>                   jingle_handler;
     std::unique_ptr<conference::ConferenceCallbacks> conference_callbacks;
     std::unique_ptr<conference::Conference>          conference;
-    ws::Connection*                                  ws_conn;
+    std::thread                                      pinger;
 };
 
 namespace {
@@ -590,7 +591,7 @@ auto gst_jitsibin_init(GstJitsiBin* jitsibin) -> void {
         });
     }
 
-    static auto pinger = std::thread([&self]() {
+    self.pinger = std::thread([&self]() {
         while(true) {
             const auto iq = xmpp::elm::iq.clone()
                                 .append_attrs({
