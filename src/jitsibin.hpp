@@ -1,10 +1,6 @@
 #pragma once
 #include <gst/gst.h>
 
-#include "jitsi/conference.hpp"
-#include "jitsi/jingle-handler/jingle.hpp"
-#include "jitsi/websocket.hpp"
-
 extern "C" {
 G_BEGIN_DECLS
 #define GST_TYPE_JITSIBIN \
@@ -18,15 +14,14 @@ G_BEGIN_DECLS
 #define GST_IS_JITSIBIN_CLASS(klass) \
     (G_TYPE_CHECK_CLASS_TYPE((klass), GST_TYPE_JITSIBIN))
 
+struct RealSelf;
+
 struct GstJitsiBin {
     GstBin  bin;
-    GstPad* sink;
-    GstPad* src;
 
-    std::unique_ptr<JingleHandler>                   jingle_handler;
-    std::unique_ptr<conference::ConferenceCallbacks> conference_callbacks;
-    std::unique_ptr<conference::Conference>          conference;
-    ws::Connection*                                  ws_conn;
+    // many fields are not trivially constructible and
+    // initializing every field explicitly is pain...
+    RealSelf* real_self;
 };
 
 struct GstJitsiBinClass {

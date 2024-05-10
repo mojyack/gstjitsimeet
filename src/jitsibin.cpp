@@ -7,10 +7,13 @@
 
 #include "auto-gst-object.hpp"
 #include "jitsi/autoptr.hpp"
+#include "jitsi/conference.hpp"
+#include "jitsi/jingle-handler/jingle.hpp"
 #include "jitsi/unwrap.hpp"
 #include "jitsi/util/charconv.hpp"
 #include "jitsi/util/event.hpp"
 #include "jitsi/util/misc.hpp"
+#include "jitsi/websocket.hpp"
 #include "jitsi/xmpp/elements.hpp"
 #include "jitsi/xmpp/negotiator.hpp"
 #include "jitsibin.hpp"
@@ -20,11 +23,19 @@
 #define gst_jitsibin_parent_class parent_class
 G_DEFINE_TYPE(GstJitsiBin, gst_jitsibin, GST_TYPE_BIN);
 
+struct RealSelf {
+    GstBin*                                          bin;
+    std::unique_ptr<JingleHandler>                   jingle_handler;
+    std::unique_ptr<conference::ConferenceCallbacks> conference_callbacks;
+    std::unique_ptr<conference::Conference>          conference;
+    ws::Connection*                                  ws_conn;
+};
+
 namespace {
 GST_DEBUG_CATEGORY_STATIC(jitsibin_debug);
 
 #define call_vfunc(self, func, ...) \
-    GST_BIN_GET_CLASS(&self.bin)->func(&self.bin, __VA_ARGS__)
+    GST_BIN_GET_CLASS(self.bin)->func(self.bin, __VA_ARGS__)
 
 declare_autoptr(GstStructure, GstStructure, gst_structure_free);
 declare_autoptr(GString, gchar, g_free);
@@ -67,7 +78,7 @@ auto get_prop(GObject* obj, const guint id, GValue* value, GParamSpec* spec) -> 
 
 auto rtpbin_request_pt_map_handler(GstElement* const rtpbin, const guint session, const guint pt, const gpointer data) -> GstCaps* {
     PRINT("rtpbin request-pt-map session=", session, " pt=", pt);
-    auto&       self           = *std::bit_cast<GstJitsiBin*>(data);
+    auto&       self           = *std::bit_cast<RealSelf*>(data);
     const auto& jingle_session = self.jingle_handler->get_session();
 
     const auto caps = gst_caps_new_simple("application/x-rtp",
@@ -134,7 +145,7 @@ auto rtpbin_request_pt_map_handler(GstElement* const rtpbin, const guint session
 
 auto rtpbin_new_jitterbuffer_handler(GstElement* const rtpbin, GstElement* const jitterbuffer, const guint session, const guint ssrc, gpointer const data) -> void {
     PRINT("rtpbin new-jitterbuffer session=", session, " ssrc=", ssrc);
-    auto&       self           = *std::bit_cast<GstJitsiBin*>(data);
+    auto&       self           = *std::bit_cast<RealSelf*>(data);
     const auto& jingle_session = self.jingle_handler->get_session();
 
     auto source = (const Source*)(nullptr);
@@ -188,7 +199,7 @@ auto aux_handler_create_ghost_pad(GstElement* const target, const guint session,
 
 auto rtpbin_request_aux_sender_handler(GstElement* const rtpbin, const guint session, gpointer const data) -> GstElement* {
     PRINT("rtpbin request-aux-sender session=", session);
-    auto&       self           = *std::bit_cast<GstJitsiBin*>(data);
+    auto&       self           = *std::bit_cast<RealSelf*>(data);
     const auto& jingle_session = self.jingle_handler->get_session();
 
     const auto pt_map   = aux_handler_create_pt_map(jingle_session.codecs);
@@ -217,7 +228,7 @@ auto rtpbin_request_aux_sender_handler(GstElement* const rtpbin, const guint ses
 
 auto rtpbin_request_aux_receiver_handler(GstElement* const rtpbin, const guint session, gpointer const data) -> GstElement* {
     PRINT("rtpbin request-aux-receiver session=", session);
-    auto&       self           = *std::bit_cast<GstJitsiBin*>(data);
+    auto&       self           = *std::bit_cast<RealSelf*>(data);
     const auto& jingle_session = self.jingle_handler->get_session();
 
     const auto pt_map = aux_handler_create_pt_map(jingle_session.codecs);
@@ -251,7 +262,7 @@ auto pay_depay_request_extension_handler(GstRTPBaseDepayload* depay, const guint
 
 auto rtpbin_pad_added_handler(GstElement* const rtpbin, GstPad* const pad, gpointer const data) -> void {
     PRINT("rtpbin pad_added");
-    auto&       self           = *std::bit_cast<GstJitsiBin*>(data);
+    auto&       self           = *std::bit_cast<RealSelf*>(data);
     const auto& jingle_session = self.jingle_handler->get_session();
 
     const auto name_g = AutoGString(gst_object_get_name(GST_OBJECT(pad)));
@@ -312,12 +323,12 @@ auto rtpbin_pad_added_handler(GstElement* const rtpbin, GstPad* const pad, gpoin
     const auto ghost_pad = AutoGstObject(gst_ghost_pad_new(ghost_pad_name.data(), depay_src_pad.get()));
     assert_n(ghost_pad.get() != NULL);
 
-    assert_n(gst_element_add_pad(GST_ELEMENT(&self), ghost_pad.get()) == TRUE);
+    assert_n(gst_element_add_pad(GST_ELEMENT(self.bin), ghost_pad.get()) == TRUE);
 
     return;
 }
 
-auto construct_sub_pipeline(GstJitsiBin& self, const CodecType audio_codec_type, const CodecType video_codec_type) -> bool {
+auto construct_sub_pipeline(RealSelf& self, const CodecType audio_codec_type, const CodecType video_codec_type) -> bool {
     static auto serial_num     = std::atomic_int(0);
     const auto& jingle_session = self.jingle_handler->get_session();
 
@@ -459,8 +470,7 @@ auto construct_sub_pipeline(GstJitsiBin& self, const CodecType audio_codec_type,
     // expose sink pad
     unwrap_pb_mut(video_pay_sink, gst_element_get_static_pad(video_pay, "sink"));
     unwrap_pb_mut(jitsibin_sink, gst_ghost_pad_new("sink", &video_pay_sink));
-    assert_b(gst_element_add_pad(GST_ELEMENT(&self), &jitsibin_sink) == TRUE);
-    self.sink = &jitsibin_sink;
+    assert_b(gst_element_add_pad(GST_ELEMENT(self.bin), &jitsibin_sink) == TRUE);
 
     return true;
 }
@@ -502,7 +512,10 @@ struct ConferenceCallbacks : public conference::ConferenceCallbacks {
 auto gst_jitsibin_init(GstJitsiBin* jitsibin) -> void {
     GST_LOG("init");
 
-    auto& self = *jitsibin;
+    jitsibin->real_self = new RealSelf();
+
+    auto& self = *jitsibin->real_self;
+    self.bin   = &jitsibin->bin;
 
     constexpr auto audio_codec_type = CodecType::Opus;
     constexpr auto video_codec_type = CodecType::H264; // TODO
@@ -540,14 +553,13 @@ auto gst_jitsibin_init(GstJitsiBin* jitsibin) -> void {
     event.clear();
 
     const auto jingle_handler = new JingleHandler(audio_codec_type, video_codec_type, jid, ext_sv, &event);
-    new(&self.jingle_handler) std::unique_ptr<JingleHandler>(jingle_handler);
+    self.jingle_handler.reset(jingle_handler);
     // join to conference
     const auto callbacks      = new ConferenceCallbacks();
     callbacks->ws_conn        = self.ws_conn;
     callbacks->jingle_handler = jingle_handler;
-    new(&self.conference_callbacks) std::unique_ptr<conference::ConferenceCallbacks>();
-    new(&self.conference) std::unique_ptr<conference::Conference>(
-        conference::Conference::create(room, jid, callbacks));
+    self.conference_callbacks.reset(callbacks);
+    self.conference = conference::Conference::create(room, jid, callbacks);
     ws::add_receiver(self.ws_conn, [&self](const std::span<std::byte> data) -> ws::ReceiverResult {
         // feed_payload always returns true in current implementation
         self.conference->feed_payload(std::string_view((char*)data.data(), data.size()));
@@ -578,7 +590,7 @@ auto gst_jitsibin_init(GstJitsiBin* jitsibin) -> void {
         });
     }
 
-    static auto pinger = std::thread([jitsibin]() {
+    static auto pinger = std::thread([&self]() {
         while(true) {
             const auto iq = xmpp::elm::iq.clone()
                                 .append_attrs({
@@ -587,7 +599,7 @@ auto gst_jitsibin_init(GstJitsiBin* jitsibin) -> void {
                                 .append_children({
                                     xmpp::elm::ping,
                                 });
-            jitsibin->conference->send_iq(iq, {});
+            self.conference->send_iq(iq, {});
             std::this_thread::sleep_for(std::chrono::seconds(10));
         }
     });
@@ -600,10 +612,12 @@ auto gst_jitsibin_init(GstJitsiBin* jitsibin) -> void {
 }
 
 auto gst_jitsibin_finalize(GObject* object) -> void {
-    auto& self = *GST_JITSIBIN(object);
+    const auto jitsibin = GST_JITSIBIN(object);
+    auto&      self     = *jitsibin->real_self;
 
     ws::free_connection(self.ws_conn);
-    self.jingle_handler.reset();
+
+    delete &self;
 
     G_OBJECT_CLASS(parent_class)->finalize(object);
 }
