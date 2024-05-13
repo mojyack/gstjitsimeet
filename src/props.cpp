@@ -57,29 +57,29 @@ auto Props::install_props(GObjectClass* const obj) -> void {
                                                         NULL,
                                                         "FQDN of jitsi meet server",
                                                         "",
-                                                        GParamFlags(G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY)));
+                                                        GParamFlags(G_PARAM_READWRITE)));
     g_object_class_install_property(obj, room_name_id,
                                     g_param_spec_string("room",
                                                         NULL,
                                                         "Room name of the conference",
                                                         "",
-                                                        GParamFlags(G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY)));
+                                                        GParamFlags(G_PARAM_READWRITE)));
     g_object_class_install_property(obj, last_n_id,
                                     g_param_spec_int("receive-limit",
                                                      NULL,
                                                      "Maximum number of participants to receive streams from (-1 for unlimit)",
                                                      -1, std::numeric_limits<int>::max(), 0,
-                                                     GParamFlags(G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY)));
+                                                     GParamFlags(G_PARAM_READWRITE)));
     g_object_class_install_property(obj, secure_id,
                                     g_param_spec_boolean("insecure",
                                                          NULL,
                                                          "Trust server self-signed certification",
                                                          FALSE,
-                                                         GParamFlags(G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY)));
+                                                         GParamFlags(G_PARAM_READWRITE)));
     g_object_class_install_property(obj, async_sink_id,
                                     g_param_spec_boolean("force-play",
                                                          NULL,
                                                          "Force pipeline to play even in conference with no participants",
                                                          FALSE,
-                                                         GParamFlags(G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY)));
+                                                         GParamFlags(G_PARAM_READWRITE)));
 }
