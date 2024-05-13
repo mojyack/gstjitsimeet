@@ -315,8 +315,10 @@ auto rtpbin_pad_added_handler(GstElement* const rtpbin, GstPad* const pad, gpoin
     assert_n(depay_sink_pad.get() != NULL);
     assert_n(gst_pad_link(pad, GST_PAD(depay_sink_pad.get())) == GST_PAD_LINK_OK);
 
-    if(false) {
-        // add fakesink
+    if(self.last_n == 0) {
+        // we should not reach here
+        // why jvb send stream while last_n == 0?
+        // user probably do not handle this pad, so add fakesink to prevent broken pipeline
         const auto fakesink = AutoGstObject(gst_element_factory_make("fakesink", NULL));
         assert_n(call_vfunc(self, add_element, fakesink.get()) == TRUE);
         assert_n(gst_element_sync_state_with_parent(fakesink.get()));
