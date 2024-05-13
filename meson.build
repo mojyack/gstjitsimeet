@@ -1,8 +1,10 @@
 project('gstjitsimeet', 'cpp', version : '0.0', default_options : ['warning_level=3', 'cpp_std=c++20'])
 add_global_arguments('-Wfatal-errors', language: 'cpp')
 
+gstreamer_dep = dependency('gstreamer-1.0', version : ['>=1.20'])
+
 deps = [
-  dependency('gstreamer-1.0', version : ['>=1.16']),
+  gstreamer_dep,
   dependency('gstreamer-rtp-1.0'),
   dependency('threads'),
   dependency('openssl'),
@@ -24,5 +26,11 @@ library('gstjitsimeet', src + libjitsimeet_src,
 
 executable('example', 
         files('src/example.cpp'),
-        dependencies: dependency('gstreamer-1.0'), # TODO: refactor
+        dependencies: [gstreamer_dep]
+) 
+
+# TODO: remove this example
+executable('dynamic-switch-example', 
+        files('src/dynamic-switch-example.cpp'),
+        dependencies: [gstreamer_dep]
 ) 
