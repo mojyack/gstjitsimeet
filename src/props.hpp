@@ -10,6 +10,15 @@ struct Props {
         last_n_id,
         secure_id,
         async_sink_id,
+        // libjitsimeet config
+        libws_loglevel_bitmap_id,
+        dump_websocket_packets_id,
+        debug_websocket_id,
+        debug_xmpp_connection_id,
+        debug_conference_id,
+        debug_jingle_handler_id,
+        debug_ice_id,
+        debug_colibri_id,
     };
 
     std::string server_address;
