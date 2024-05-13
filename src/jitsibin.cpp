@@ -561,9 +561,13 @@ auto wait_for_jingle_and_setup_pipeline(RealSelf& self, const CodecType audio_co
 
     // expose real pipeline
     if(self.props.async_sink) {
-        // ghostpad already created in setup_stub_pipeline, just replace stub sink with real sink
+        // we are in sub thread
+        // the ghostpad's target is stub sink
+        // replace stub sink with real sink
         replace_stub_sink_with_real_sink(self);
     } else {
+        // we are in main thread
+        // the ghostpad has no target
         // link real sink to ghostpad
         const auto real_sink_pad = AutoGstObject(gst_element_get_static_pad(self.real_sink, "sink"));
         assert_b(real_sink_pad.get() != NULL);
