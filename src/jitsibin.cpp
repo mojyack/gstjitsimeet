@@ -611,7 +611,7 @@ auto wait_for_jingle_and_setup_pipeline(RealSelf& self, const CodecType audio_co
 struct XMPPNegotiatorCallbacks : public xmpp::NegotiatorCallbacks {
     ws::Connection* ws_conn;
 
-    virtual auto send_payload(std::string_view payload) -> void override {
+    auto send_payload(std::string_view payload) -> void override {
         ws::send_str(ws_conn, payload);
     }
 };
@@ -621,25 +621,25 @@ struct ConferenceCallbacks : public conference::ConferenceCallbacks {
     ws::Connection* ws_conn;
     JingleHandler*  jingle_handler;
 
-    virtual auto send_payload(std::string_view payload) -> void override {
+    auto send_payload(std::string_view payload) -> void override {
         ws::send_str(ws_conn, payload);
     }
 
-    virtual auto on_jingle_initiate(jingle::Jingle jingle) -> bool override {
+    auto on_jingle_initiate(jingle::Jingle jingle) -> bool override {
         return jingle_handler->on_initiate(std::move(jingle));
     }
 
-    virtual auto on_jingle_add_source(jingle::Jingle jingle) -> bool override {
+    auto on_jingle_add_source(jingle::Jingle jingle) -> bool override {
         return jingle_handler->on_add_source(std::move(jingle));
     }
 
-    virtual auto on_participant_joined(const conference::Participant& participant) -> void override {
+    auto on_participant_joined(const conference::Participant& participant) -> void override {
         print("participant joined ", participant.participant_id, " ", participant.nick);
         const auto signal = GST_JITSIBIN_GET_CLASS(jitsibin)->participant_joined_signal;
         g_signal_emit(jitsibin, signal, 0, participant.participant_id.data(), participant.nick.data());
     }
 
-    virtual auto on_participant_left(const conference::Participant& participant) -> void override {
+    auto on_participant_left(const conference::Participant& participant) -> void override {
         print("participant left ", participant.participant_id, " ", participant.nick);
         const auto signal = GST_JITSIBIN_GET_CLASS(jitsibin)->participant_left_signal;
         g_signal_emit(jitsibin, signal, 0, participant.participant_id.data(), participant.nick.data());
