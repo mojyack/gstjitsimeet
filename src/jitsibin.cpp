@@ -617,6 +617,7 @@ struct XMPPNegotiatorCallbacks : public xmpp::NegotiatorCallbacks {
 };
 
 struct ConferenceCallbacks : public conference::ConferenceCallbacks {
+    GstJitsiBin*    jitsibin;
     ws::Connection* ws_conn;
     JingleHandler*  jingle_handler;
 
@@ -634,10 +635,14 @@ struct ConferenceCallbacks : public conference::ConferenceCallbacks {
 
     virtual auto on_participant_joined(const conference::Participant& participant) -> void override {
         print("participant joined ", participant.participant_id, " ", participant.nick);
+        const auto signal = GST_JITSIBIN_GET_CLASS(jitsibin)->participant_joined_signal;
+        g_signal_emit(jitsibin, signal, 0, participant.participant_id.data(), participant.nick.data());
     }
 
     virtual auto on_participant_left(const conference::Participant& participant) -> void override {
         print("participant left ", participant.participant_id, " ", participant.nick);
+        const auto signal = GST_JITSIBIN_GET_CLASS(jitsibin)->participant_left_signal;
+        g_signal_emit(jitsibin, signal, 0, participant.participant_id.data(), participant.nick.data());
     }
 };
 
@@ -682,6 +687,7 @@ auto null_to_ready(RealSelf& self) -> bool {
 
     // join to conference
     const auto callbacks      = new ConferenceCallbacks();
+    callbacks->jitsibin       = GST_JITSIBIN(self.bin);
     callbacks->ws_conn        = self.ws_conn;
     callbacks->jingle_handler = jingle_handler;
     self.conference_callbacks.reset(callbacks);
@@ -764,6 +770,9 @@ auto gst_jitsibin_finalize(GObject* object) -> void {
 
 auto gst_jitsibin_class_init(GstJitsiBinClass* klass) -> void {
     GST_DEBUG_CATEGORY_INIT(jitsibin_debug, "jitsibin", 0, "jitsibin");
+
+    klass->participant_joined_signal = g_signal_new("participant-joined", G_TYPE_FROM_CLASS(klass), G_SIGNAL_RUN_FIRST, 0, NULL, NULL, NULL, G_TYPE_NONE, 2, G_TYPE_STRING, G_TYPE_STRING);
+    klass->participant_left_signal   = g_signal_new("participant-left", G_TYPE_FROM_CLASS(klass), G_SIGNAL_RUN_FIRST, 0, NULL, NULL, NULL, G_TYPE_NONE, 2, G_TYPE_STRING, G_TYPE_STRING);
 
     parent_class = g_type_class_peek_parent(klass);
 

@@ -97,6 +97,14 @@ auto jitsibin_pad_removed_handler(GstElement* const jitisbin, GstPad* const pad,
     PRINT("pad removed name=", name);
 }
 
+auto jitsibin_participant_joined_handler(GstElement* const jitisbin, const gchar* const participant_id, const gchar* const nick) -> void {
+    PRINT("participant joined ", participant_id, " ", nick);
+}
+
+auto jitsibin_participant_left_handler(GstElement* const jitisbin, const gchar* const participant_id, const gchar* const nick) -> void {
+    PRINT("participant left ", participant_id, " ", nick);
+}
+
 auto run_pipeline(GstElement* pipeline) -> bool {
     assert_b(gst_element_set_state(pipeline, GST_STATE_PLAYING) == GST_STATE_CHANGE_SUCCESS);
 
@@ -150,6 +158,8 @@ auto run() -> bool {
     unwrap_pb_mut(jitsibin, add_new_element_to_pipeine(pipeline.get(), "jitsibin"));
     g_signal_connect(&jitsibin, "pad-added", G_CALLBACK(jitsibin_pad_added_handler), &context);
     g_signal_connect(&jitsibin, "pad-removed", G_CALLBACK(jitsibin_pad_removed_handler), &context);
+    g_signal_connect(&jitsibin, "participant-joined", G_CALLBACK(jitsibin_participant_joined_handler), &context);
+    g_signal_connect(&jitsibin, "participant-left", G_CALLBACK(jitsibin_participant_left_handler), &context);
 
     g_object_set(&waylandsink,
                  "async", FALSE,
