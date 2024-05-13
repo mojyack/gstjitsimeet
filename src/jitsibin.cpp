@@ -545,7 +545,9 @@ auto wait_for_jingle_and_setup_pipeline(RealSelf& self, const CodecType audio_co
 
     self.colibri = colibri::Colibri::connect(self.jingle_handler->get_session().initiate_jingle, self.secure);
     assert_b(self.colibri.get() != nullptr);
-    self.colibri->set_last_n(self.last_n);
+    if(self.last_n >= 0) {
+        self.colibri->set_last_n(self.last_n);
+    }
 
     // create pipeline based on the jingle information
     PRINT("creating pipeline");
