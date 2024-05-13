@@ -549,7 +549,7 @@ auto wait_for_jingle_and_setup_pipeline(RealSelf& self, const CodecType audio_co
 
     // create pipeline based on the jingle information
     PRINT("creating pipeline");
-    DYN_ASSERT(construct_sub_pipeline(self, audio_codec_type, video_codec_type));
+    assert_b(construct_sub_pipeline(self, audio_codec_type, video_codec_type));
 
     // expose real pipeline
     if(self.async_sink) {
