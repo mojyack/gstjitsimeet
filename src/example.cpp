@@ -154,6 +154,12 @@ auto run() -> bool {
     g_object_set(&waylandsink,
                  "async", FALSE,
                  NULL);
+    g_object_set(&jitsibin,
+                 "server", "jitsi.local",
+                 "room", "room",
+                 "receive-limit", 3,
+                 "force-play", TRUE,
+                 NULL);
 
     assert_b(gst_element_link_pads(&videotestsrc, NULL, &tee, NULL) == TRUE);
     assert_b(gst_element_link_pads(&tee, NULL, &waylandsink, NULL) == TRUE);

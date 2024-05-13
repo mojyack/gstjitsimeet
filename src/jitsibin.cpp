@@ -520,7 +520,7 @@ auto replace_stub_sink_with_real_sink(RealSelf& self, bool callbacked) -> bool {
     // link real sink to ghostpad
     const auto target_sink_pad = AutoGstObject(gst_element_get_static_pad(self.real_sink, "sink"));
     assert_b(target_sink_pad.get() != NULL);
-    gst_ghost_pad_set_target(GST_GHOST_PAD(self.sink_pad), target_sink_pad.get());
+    assert_b(gst_ghost_pad_set_target(GST_GHOST_PAD(self.sink_pad), target_sink_pad.get()) == TRUE);
 
     // sync state
     assert_b(gst_bin_sync_children_states(self.bin) == TRUE);
@@ -535,13 +535,13 @@ auto setup_stub_pipeline(RealSelf& self) -> bool {
                  "async", FALSE,
                  NULL);
     assert_b(call_vfunc(self, add_element, fakesink) == TRUE);
-
-    // expose sink pad
-    unwrap_pb_mut(fakesink_sink, gst_element_get_static_pad(fakesink, "sink"));
-    unwrap_pb_mut(jitsibin_sink, gst_ghost_pad_new("sink", &fakesink_sink));
-    assert_b(gst_element_add_pad(GST_ELEMENT(self.bin), &jitsibin_sink) == TRUE);
     self.stub_sink = fakesink;
-    self.sink_pad  = &jitsibin_sink;
+
+    // link stub sink to ghostpad
+    const auto fakesink_sink_pad = AutoGstObject(gst_element_get_static_pad(fakesink, "sink"));
+    assert_b(fakesink_sink_pad.get() != NULL);
+    assert_b(gst_ghost_pad_set_target(GST_GHOST_PAD(self.sink_pad), fakesink_sink_pad.get()) == TRUE);
+
     return true;
 }
 
@@ -564,11 +564,10 @@ auto wait_for_jingle_and_setup_pipeline(RealSelf& self, const CodecType audio_co
         // ghostpad already created in setup_stub_pipeline, just replace stub sink with real sink
         replace_stub_sink_with_real_sink(self);
     } else {
-        // create ghostpad and link with real sink
+        // link real sink to ghostpad
         const auto real_sink_pad = AutoGstObject(gst_element_get_static_pad(self.real_sink, "sink"));
         assert_b(real_sink_pad.get() != NULL);
-        unwrap_pb_mut(jitsibin_sink, gst_ghost_pad_new("sink", real_sink_pad.get()));
-        assert_b(gst_element_add_pad(GST_ELEMENT(self.bin), &jitsibin_sink) == TRUE);
+        assert_b(gst_ghost_pad_set_target(GST_GHOST_PAD(self.sink_pad), real_sink_pad.get()) == TRUE);
     }
 
     // send jingle accept
@@ -605,30 +604,6 @@ auto wait_for_jingle_and_setup_pipeline(RealSelf& self, const CodecType audio_co
     return true;
 }
 
-auto change_state(GstElement* element, const GstStateChange transition) -> GstStateChangeReturn {
-    const auto jitsibin = GST_JITSIBIN(element);
-    auto&      self     = *jitsibin->real_self;
-
-    auto ret = GST_ELEMENT_CLASS(parent_class)->change_state(element, transition);
-    assert_v(ret != GST_STATE_CHANGE_FAILURE, GST_STATE_CHANGE_FAILURE);
-
-    switch(transition) {
-    case GST_STATE_CHANGE_NULL_TO_READY:
-        break;
-    case GST_STATE_CHANGE_READY_TO_PAUSED:
-        ret = GST_STATE_CHANGE_NO_PREROLL;
-        break;
-    case GST_STATE_CHANGE_PLAYING_TO_PAUSED:
-        ret = GST_STATE_CHANGE_NO_PREROLL;
-        break;
-    case GST_STATE_CHANGE_READY_TO_NULL:
-        break;
-    default:
-        break;
-    }
-    return ret;
-}
-
 struct XMPPNegotiatorCallbacks : public xmpp::NegotiatorCallbacks {
     ws::Connection* ws_conn;
 
@@ -661,32 +636,22 @@ struct ConferenceCallbacks : public conference::ConferenceCallbacks {
         print("participant left ", participant.participant_id, " ", participant.nick);
     }
 };
-} // namespace
 
-auto gst_jitsibin_init(GstJitsiBin* jitsibin) -> void {
-    PRINT("init");
-
-    jitsibin->real_self = new RealSelf();
-
-    auto& self = *jitsibin->real_self;
-    self.bin   = &jitsibin->bin;
-
-    // DYN_ASSERT(self.props.ensure_required_prop());
+auto null_to_ready(RealSelf& self) -> bool {
+    assert_b(self.props.ensure_required_prop());
 
     constexpr auto audio_codec_type = CodecType::Opus;
     constexpr auto video_codec_type = CodecType::H264; // TODO
 
-    constexpr auto host    = "jitsi.local";
-    constexpr auto room    = "room";
-    const auto     ws_path = std::string("xmpp-websocket?room=") + room;
-    self.ws_conn           = ws::create_connection(host, 443, ws_path.data(), self.props.secure);
+    const auto ws_path = std::string("xmpp-websocket?room=") + self.props.room_name;
+    self.ws_conn       = ws::create_connection(self.props.server_address.data(), 443, ws_path.data(), self.props.secure);
 
     // gain jid from server
     {
         auto negotiate_done_event = Event();
         auto callbacks            = XMPPNegotiatorCallbacks();
         callbacks.ws_conn         = self.ws_conn;
-        const auto negotiator     = xmpp::Negotiator::create(host, &callbacks);
+        const auto negotiator     = xmpp::Negotiator::create(self.props.server_address, &callbacks);
         ws::add_receiver(self.ws_conn, [&negotiator, &negotiate_done_event](const std::span<std::byte> data) -> ws::ReceiverResult {
             const auto payload = std::string_view(std::bit_cast<char*>(data.data()), data.size());
             const auto done    = negotiator->feed_payload(payload);
@@ -716,7 +681,7 @@ auto gst_jitsibin_init(GstJitsiBin* jitsibin) -> void {
     callbacks->ws_conn        = self.ws_conn;
     callbacks->jingle_handler = jingle_handler;
     self.conference_callbacks.reset(callbacks);
-    self.conference = conference::Conference::create(room, self.jid, callbacks);
+    self.conference = conference::Conference::create(self.props.room_name, self.jid, callbacks);
     ws::add_receiver(self.ws_conn, [&self](const std::span<std::byte> data) -> ws::ReceiverResult {
         // feed_payload always returns true in current implementation
         self.conference->feed_payload(std::string_view((char*)data.data(), data.size()));
@@ -729,7 +694,7 @@ auto gst_jitsibin_init(GstJitsiBin* jitsibin) -> void {
      * therefore, wait_for_jingle_and_setup_pipeline is a blocking function.
      */
     if(self.props.async_sink) {
-        assert_n(setup_stub_pipeline(self));
+        assert_b(setup_stub_pipeline(self));
         // wait for jingle in another thread, in order to avoid blocking entire pipeline.
         self.session_initiate_jingle_wait_thread = std::thread([&self, audio_codec_type, video_codec_type]() {
             wait_for_jingle_and_setup_pipeline(self, audio_codec_type, video_codec_type);
@@ -737,17 +702,58 @@ auto gst_jitsibin_init(GstJitsiBin* jitsibin) -> void {
     } else {
         wait_for_jingle_and_setup_pipeline(self, audio_codec_type, video_codec_type);
     }
+
+    return true;
+}
+
+auto ready_to_null(RealSelf& self) -> bool {
+    ws::free_connection(self.ws_conn);
+    return true;
+}
+
+auto change_state(GstElement* element, const GstStateChange transition) -> GstStateChangeReturn {
+    const auto jitsibin = GST_JITSIBIN(element);
+    auto&      self     = *jitsibin->real_self;
+
+    auto ret = GST_ELEMENT_CLASS(parent_class)->change_state(element, transition);
+    assert_v(ret != GST_STATE_CHANGE_FAILURE, GST_STATE_CHANGE_FAILURE);
+
+    switch(transition) {
+    case GST_STATE_CHANGE_NULL_TO_READY:
+        assert_v(null_to_ready(self), GST_STATE_CHANGE_FAILURE);
+        break;
+    case GST_STATE_CHANGE_READY_TO_PAUSED:
+        ret = GST_STATE_CHANGE_NO_PREROLL;
+        break;
+    case GST_STATE_CHANGE_PLAYING_TO_PAUSED:
+        ret = GST_STATE_CHANGE_NO_PREROLL;
+        break;
+    case GST_STATE_CHANGE_READY_TO_NULL:
+        assert_v(ready_to_null(self), GST_STATE_CHANGE_FAILURE);
+        break;
+    default:
+        break;
+    }
+    return ret;
+}
+} // namespace
+
+auto gst_jitsibin_init(GstJitsiBin* jitsibin) -> void {
+    jitsibin->real_self      = new RealSelf();
+    jitsibin->real_self->bin = &jitsibin->bin;
+
+    auto& self = *jitsibin->real_self;
+
+    unwrap_pn_mut(jitsibin_sink, gst_ghost_pad_new_no_target("sink", GST_PAD_SINK));
+    assert_n(gst_element_add_pad(GST_ELEMENT(self.bin), &jitsibin_sink) == TRUE);
+    self.sink_pad = &jitsibin_sink;
+
     return;
 }
 
 auto gst_jitsibin_finalize(GObject* object) -> void {
     const auto jitsibin = GST_JITSIBIN(object);
-    auto&      self     = *jitsibin->real_self;
-
-    ws::free_connection(self.ws_conn);
-
-    delete &self;
-
+    delete jitsibin->real_self;
     G_OBJECT_CLASS(parent_class)->finalize(object);
 }
 
