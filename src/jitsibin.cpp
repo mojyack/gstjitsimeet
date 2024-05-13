@@ -18,6 +18,7 @@
 #include "jitsi/xmpp/elements.hpp"
 #include "jitsi/xmpp/negotiator.hpp"
 #include "jitsibin.hpp"
+#include "props.hpp"
 
 #define GST_CAT_DEFAULT jitsibin_debug
 
@@ -36,16 +37,13 @@ struct RealSelf {
     std::vector<xmpp::Service>                       extenal_services;
     Event                                            session_initiate_jingle_arrived_event;
 
+    Props props;
+
     // for unblocking setup
     GstPad*     sink_pad;
     GstElement* stub_sink;
     GstElement* real_sink;
     std::thread session_initiate_jingle_wait_thread;
-
-    // props
-    bool secure     = true;
-    bool async_sink = false;
-    int  last_n     = 0;
 };
 
 namespace {
@@ -87,10 +85,16 @@ auto codec_type_to_depayloader_name(const CodecType type) -> const char* {
     }
 }
 
-auto set_prop(GObject* obj, const guint id, const GValue* value, GParamSpec* spec) -> void {
+auto set_prop(GObject* obj, const guint id, const GValue* const value, GParamSpec* const spec) -> void {
+    const auto jitsibin = GST_JITSIBIN(obj);
+    auto&      self     = *jitsibin->real_self;
+    self.props.handle_set_prop(id, value, spec);
 }
 
-auto get_prop(GObject* obj, const guint id, GValue* value, GParamSpec* spec) -> void {
+auto get_prop(GObject* obj, const guint id, GValue* const value, GParamSpec* const spec) -> void {
+    const auto jitsibin = GST_JITSIBIN(obj);
+    auto&      self     = *jitsibin->real_self;
+    self.props.handle_get_prop(id, value, spec);
 }
 
 auto rtpbin_request_pt_map_handler(GstElement* const rtpbin, const guint session, const guint pt, const gpointer data) -> GstCaps* {
@@ -315,7 +319,7 @@ auto rtpbin_pad_added_handler(GstElement* const rtpbin, GstPad* const pad, gpoin
     assert_n(depay_sink_pad.get() != NULL);
     assert_n(gst_pad_link(pad, GST_PAD(depay_sink_pad.get())) == GST_PAD_LINK_OK);
 
-    if(self.last_n == 0) {
+    if(self.props.last_n == 0) {
         // we should not reach here
         // why jvb send stream while last_n == 0?
         // user probably do not handle this pad, so add fakesink to prevent broken pipeline
@@ -545,10 +549,10 @@ auto wait_for_jingle_and_setup_pipeline(RealSelf& self, const CodecType audio_co
     // wait for jingle initiation
     self.session_initiate_jingle_arrived_event.wait();
 
-    self.colibri = colibri::Colibri::connect(self.jingle_handler->get_session().initiate_jingle, self.secure);
+    self.colibri = colibri::Colibri::connect(self.jingle_handler->get_session().initiate_jingle, self.props.secure);
     assert_b(self.colibri.get() != nullptr);
-    if(self.last_n >= 0) {
-        self.colibri->set_last_n(self.last_n);
+    if(self.props.last_n >= 0) {
+        self.colibri->set_last_n(self.props.last_n);
     }
 
     // create pipeline based on the jingle information
@@ -556,7 +560,7 @@ auto wait_for_jingle_and_setup_pipeline(RealSelf& self, const CodecType audio_co
     assert_b(construct_sub_pipeline(self, audio_codec_type, video_codec_type));
 
     // expose real pipeline
-    if(self.async_sink) {
+    if(self.props.async_sink) {
         // ghostpad already created in setup_stub_pipeline, just replace stub sink with real sink
         replace_stub_sink_with_real_sink(self);
     } else {
@@ -636,16 +640,14 @@ struct ConferenceCallbacks : public conference::ConferenceCallbacks {
 } // namespace
 
 auto gst_jitsibin_init(GstJitsiBin* jitsibin) -> void {
-    GST_LOG("init");
+    PRINT("init");
 
     jitsibin->real_self = new RealSelf();
 
     auto& self = *jitsibin->real_self;
     self.bin   = &jitsibin->bin;
 
-    // TODO: set props
-    self.secure = false;
-    self.last_n = 3;
+    DYN_ASSERT(self.props.ensure_required_prop());
 
     constexpr auto audio_codec_type = CodecType::Opus;
     constexpr auto video_codec_type = CodecType::H264; // TODO
@@ -653,7 +655,7 @@ auto gst_jitsibin_init(GstJitsiBin* jitsibin) -> void {
     constexpr auto host    = "jitsi.local";
     constexpr auto room    = "room";
     const auto     ws_path = std::string("xmpp-websocket?room=") + room;
-    self.ws_conn           = ws::create_connection(host, 443, ws_path.data(), self.secure);
+    self.ws_conn           = ws::create_connection(host, 443, ws_path.data(), self.props.secure);
 
     // gain jid from server
     {
@@ -702,7 +704,7 @@ auto gst_jitsibin_init(GstJitsiBin* jitsibin) -> void {
      * if there are no participants in the conference, jicofo does not send session-initiate jingle.
      * therefore, wait_for_jingle_and_setup_pipeline is a blocking function.
      */
-    if(self.async_sink) {
+    if(self.props.async_sink) {
         assert_n(setup_stub_pipeline(self));
         // wait for jingle in another thread, in order to avoid blocking entire pipeline.
         self.session_initiate_jingle_wait_thread = std::thread([&self, audio_codec_type, video_codec_type]() {
@@ -731,9 +733,10 @@ auto gst_jitsibin_class_init(GstJitsiBinClass* klass) -> void {
     parent_class = g_type_class_peek_parent(klass);
 
     const auto gobject_class    = (GObjectClass*)(klass);
-    gobject_class->finalize     = gst_jitsibin_finalize;
     gobject_class->set_property = set_prop;
     gobject_class->get_property = get_prop;
+    gobject_class->finalize     = gst_jitsibin_finalize;
+    Props::install_props(gobject_class);
 
     const auto element_class = (GstElementClass*)(klass);
     // gst_element_class_add_static_pad_template(element_class, &src_pad_template);

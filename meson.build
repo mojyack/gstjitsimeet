@@ -11,6 +11,7 @@ deps = [
 src = files(
   'src/lib.cpp',
   'src/jitsibin.cpp',
+  'src/props.cpp',
 )
 
 subdir('src/jitsi')
