@@ -605,6 +605,30 @@ auto wait_for_jingle_and_setup_pipeline(RealSelf& self, const CodecType audio_co
     return true;
 }
 
+auto change_state(GstElement* element, const GstStateChange transition) -> GstStateChangeReturn {
+    const auto jitsibin = GST_JITSIBIN(element);
+    auto&      self     = *jitsibin->real_self;
+
+    auto ret = GST_ELEMENT_CLASS(parent_class)->change_state(element, transition);
+    assert_v(ret != GST_STATE_CHANGE_FAILURE, GST_STATE_CHANGE_FAILURE);
+
+    switch(transition) {
+    case GST_STATE_CHANGE_NULL_TO_READY:
+        break;
+    case GST_STATE_CHANGE_READY_TO_PAUSED:
+        ret = GST_STATE_CHANGE_NO_PREROLL;
+        break;
+    case GST_STATE_CHANGE_PLAYING_TO_PAUSED:
+        ret = GST_STATE_CHANGE_NO_PREROLL;
+        break;
+    case GST_STATE_CHANGE_READY_TO_NULL:
+        break;
+    default:
+        break;
+    }
+    return ret;
+}
+
 struct XMPPNegotiatorCallbacks : public xmpp::NegotiatorCallbacks {
     ws::Connection* ws_conn;
 
@@ -647,7 +671,7 @@ auto gst_jitsibin_init(GstJitsiBin* jitsibin) -> void {
     auto& self = *jitsibin->real_self;
     self.bin   = &jitsibin->bin;
 
-    DYN_ASSERT(self.props.ensure_required_prop());
+    // DYN_ASSERT(self.props.ensure_required_prop());
 
     constexpr auto audio_codec_type = CodecType::Opus;
     constexpr auto video_codec_type = CodecType::H264; // TODO
@@ -738,9 +762,8 @@ auto gst_jitsibin_class_init(GstJitsiBinClass* klass) -> void {
     gobject_class->finalize     = gst_jitsibin_finalize;
     Props::install_props(gobject_class);
 
-    const auto element_class = (GstElementClass*)(klass);
-    // gst_element_class_add_static_pad_template(element_class, &src_pad_template);
-    // gst_element_class_add_static_pad_template(element_class, &sink_pad_template);
+    const auto element_class    = (GstElementClass*)(klass);
+    element_class->change_state = change_state;
     gst_element_class_set_static_metadata(element_class,
                                           "Jitsi Meet Bin",
                                           "Filter/Network/RTP",
