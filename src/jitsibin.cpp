@@ -712,6 +712,7 @@ auto null_to_ready(RealSelf& self) -> bool {
 
 auto ready_to_null(RealSelf& self) -> bool {
     ws::free_connection(self.ws_conn);
+    // TODO: finish pinger
     return true;
 }
 
