@@ -7,6 +7,7 @@
 
 #include "auto-gst-object.hpp"
 #include "jitsi/autoptr.hpp"
+#include "jitsi/colibri.hpp"
 #include "jitsi/conference.hpp"
 #include "jitsi/jingle-handler/jingle.hpp"
 #include "jitsi/unwrap.hpp"
@@ -29,6 +30,7 @@ struct RealSelf {
     std::unique_ptr<JingleHandler>                   jingle_handler;
     std::unique_ptr<conference::ConferenceCallbacks> conference_callbacks;
     std::unique_ptr<conference::Conference>          conference;
+    std::unique_ptr<colibri::Colibri>                colibri;
     std::thread                                      pinger;
     xmpp::Jid                                        jid;
     std::vector<xmpp::Service>                       extenal_services;
@@ -41,7 +43,9 @@ struct RealSelf {
     std::thread session_initiate_jingle_wait_thread;
 
     // props
-    bool async_sink = true;
+    bool secure     = true;
+    bool async_sink = false;
+    int  last_n     = 0;
 };
 
 namespace {
@@ -539,6 +543,10 @@ auto wait_for_jingle_and_setup_pipeline(RealSelf& self, const CodecType audio_co
     // wait for jingle initiation
     self.session_initiate_jingle_arrived_event.wait();
 
+    self.colibri = colibri::Colibri::connect(self.jingle_handler->get_session().initiate_jingle, self.secure);
+    assert_b(self.colibri.get() != nullptr);
+    self.colibri->set_last_n(self.last_n);
+
     // create pipeline based on the jingle information
     PRINT("creating pipeline");
     DYN_ASSERT(construct_sub_pipeline(self, audio_codec_type, video_codec_type));
@@ -631,13 +639,17 @@ auto gst_jitsibin_init(GstJitsiBin* jitsibin) -> void {
     auto& self = *jitsibin->real_self;
     self.bin   = &jitsibin->bin;
 
+    // TODO: set props
+    self.secure = false;
+    self.last_n = 3;
+
     constexpr auto audio_codec_type = CodecType::Opus;
     constexpr auto video_codec_type = CodecType::H264; // TODO
 
     constexpr auto host    = "jitsi.local";
     constexpr auto room    = "room";
     const auto     ws_path = std::string("xmpp-websocket?room=") + room;
-    self.ws_conn           = ws::create_connection(host, ws_path.data(), false); // DEBUG: enable secure connection
+    self.ws_conn           = ws::create_connection(host, 443, ws_path.data(), self.secure);
 
     // gain jid from server
     {
