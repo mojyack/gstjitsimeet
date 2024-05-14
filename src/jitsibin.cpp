@@ -59,35 +59,26 @@ GST_DEBUG_CATEGORY_STATIC(jitsibin_debug);
 declare_autoptr(GstStructure, GstStructure, gst_structure_free);
 declare_autoptr(GString, gchar, g_free);
 
-auto codec_type_to_payloader_name(const CodecType type) -> const char* {
-    switch(type) {
-    case CodecType::Opus:
-        return "rtpopuspay";
-    case CodecType::H264:
-        return "rtph264pay";
-    case CodecType::Vp8:
-        return "rtpvp8pay";
-    case CodecType::Vp9:
-        return "rtpvp9pay";
-    default:
-        return nullptr;
-    }
-}
+const auto codec_type_to_payloader_name = make_str_table<CodecType>({
+    {CodecType::Opus, "rtpopuspay"},
+    {CodecType::H264, "rtph264pay"},
+    {CodecType::Vp8, "rtpvp8pay"},
+    {CodecType::Vp9, "rtpvp9pay"},
+});
 
-auto codec_type_to_depayloader_name(const CodecType type) -> const char* {
-    switch(type) {
-    case CodecType::Opus:
-        return "rtpopusdepay";
-    case CodecType::H264:
-        return "rtph264depay";
-    case CodecType::Vp8:
-        return "rtpvp8depay";
-    case CodecType::Vp9:
-        return "rtpvp9depay";
-    default:
-        return nullptr;
-    }
-}
+const auto codec_type_to_depayloader_name = make_str_table<CodecType>({
+    {CodecType::Opus, "rtpopusdepay"},
+    {CodecType::H264, "rtph264depay"},
+    {CodecType::Vp8, "rtpvp8depay"},
+    {CodecType::Vp9, "rtpvp9depay"},
+});
+
+const auto codec_type_to_rtp_encoding_name = make_str_table<CodecType>({
+    {CodecType::Opus, "OPUS"},
+    {CodecType::H264, "H264"},
+    {CodecType::Vp8, "VP8"},
+    {CodecType::Vp9, "VP9"},
+});
 
 auto set_prop(GObject* obj, const guint id, const GValue* const value, GParamSpec* const spec) -> void {
     const auto jitsibin = GST_JITSIBIN(obj);
@@ -113,12 +104,12 @@ auto rtpbin_request_pt_map_handler(GstElement* const rtpbin, const guint session
                                           NULL);
     for(const auto& codec : jingle_session.codecs) {
         if(codec.tx_pt == int(pt)) {
+            unwrap_pp(encoding_name, codec_type_to_rtp_encoding_name.find(codec.type));
             switch(codec.type) {
             case CodecType::Opus: {
-                const auto encoding_name = "OPUS";
                 gst_caps_set_simple(caps,
                                     "media", G_TYPE_STRING, "audio",
-                                    "encoding-name", G_TYPE_STRING, encoding_name,
+                                    "encoding-name", G_TYPE_STRING, encoding_name.second,
                                     "clock-rate", G_TYPE_INT, 48000,
                                     NULL);
                 if(const auto ext = jingle_session.audio_hdrext_transport_cc; ext != -1) {
@@ -138,11 +129,9 @@ auto rtpbin_request_pt_map_handler(GstElement* const rtpbin, const guint session
             case CodecType::H264:
             case CodecType::Vp8:
             case CodecType::Vp9: {
-                const auto encoding_name = codec_type_str.find(codec.type);
-                assert_p(encoding_name != nullptr, "codec_type_str bug");
                 gst_caps_set_simple(caps,
                                     "media", G_TYPE_STRING, "video",
-                                    "encoding-name", G_TYPE_STRING, encoding_name->second,
+                                    "encoding-name", G_TYPE_STRING, encoding_name.second,
                                     "clock-rate", G_TYPE_INT, 90000,
                                     "rtcp-fb-nack-pli", G_TYPE_BOOLEAN, TRUE,
                                     NULL);
@@ -336,7 +325,8 @@ auto rtpbin_pad_added_handler(GstElement* const rtpbin, GstPad* const pad, gpoin
 
     // add depayloader
     unwrap_pn(codec, jingle_session.find_codec_by_tx_pt(pt), "cannot find depayloader for such payload type");
-    const auto depay = AutoGstObject(gst_element_factory_make(codec_type_to_depayloader_name(codec.type), NULL));
+    unwrap_pn(depayloader_name, codec_type_to_depayloader_name.find(codec.type));
+    const auto depay = AutoGstObject(gst_element_factory_make(depayloader_name.second, NULL));
     g_object_set(depay.get(),
                  "auto-header-extension", FALSE,
                  NULL);
@@ -364,9 +354,8 @@ auto rtpbin_pad_added_handler(GstElement* const rtpbin, GstPad* const pad, gpoin
     }
 
     // expose src pad
-    const auto encoding_name = codec_type_str.find(codec.type);
-    assert_n(encoding_name != nullptr, "codec_type_str bug");
-    const auto ghost_pad_name = build_string(source->participant_id, "_", encoding_name->second, "_", ssrc);
+    unwrap_pn(encoding_name, codec_type_to_rtp_encoding_name.find(codec.type));
+    const auto ghost_pad_name = build_string(source->participant_id, "_", encoding_name.second, "_", ssrc);
 
     const auto depay_src_pad = AutoGstObject(gst_element_get_static_pad(depay.get(), "src"));
     assert_n(depay_src_pad.get() != NULL);
@@ -442,8 +431,8 @@ auto construct_sub_pipeline(RealSelf& self, const CodecType audio_codec_type, co
 
     // audio payloader
     unwrap_pb(audio_codec, jingle_session.find_codec_by_type(audio_codec_type));
-    const auto audio_pay_name = codec_type_to_payloader_name(audio_codec_type);
-    const auto audio_pay      = gst_element_factory_make(audio_pay_name, NULL);
+    unwrap_pb(audio_pay_name, codec_type_to_payloader_name.find(audio_codec_type));
+    const auto audio_pay = gst_element_factory_make(audio_pay_name.second, NULL);
     assert_b(audio_pay != NULL, "failed to create audio payloader");
     g_object_set(audio_pay,
                  "pt", audio_codec.tx_pt,
@@ -469,8 +458,8 @@ auto construct_sub_pipeline(RealSelf& self, const CodecType audio_codec_type, co
 
     // video payloader
     unwrap_pb(video_codec, jingle_session.find_codec_by_type(video_codec_type));
-    const auto video_pay_name = codec_type_to_payloader_name(video_codec_type);
-    const auto video_pay      = gst_element_factory_make(video_pay_name, NULL);
+    unwrap_pb(video_pay_name, codec_type_to_payloader_name.find(video_codec_type));
+    const auto video_pay = gst_element_factory_make(video_pay_name.second, NULL);
     assert_b(video_pay != NULL, "failed to create video payloader");
     g_object_set(video_pay,
                  "pt", video_codec.tx_pt,

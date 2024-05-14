@@ -44,7 +44,7 @@ auto jitsibin_pad_added_handler(GstElement* const jitsibin, GstPad* const pad, g
 
     auto decoder = std::string();
     // TODO: handle all codec type
-    if(codec == "opus") {
+    if(codec == "OPUS") {
         decoder = "TODO";
     } else if(codec == "H264") {
         decoder = "avdec_h264";
