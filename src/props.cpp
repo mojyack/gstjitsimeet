@@ -135,6 +135,7 @@ auto Props::install_props(GObjectClass* const obj) -> void {
                                                      GParamFlags(G_PARAM_READWRITE)));
     bool_prop(secure_id, "insecure", "Trust server self-signed certification", FALSE, false);
     bool_prop(async_sink_id, "force-play", "Force pipeline to play even in conference with no participants", FALSE, false);
+    bool_prop(verbose_id, "verbose", "Enable debug messages", FALSE, false);
     g_object_class_install_property(obj, libws_loglevel_bitmap_id,
                                     g_param_spec_uint("lws-loglevel-bitmap",
                                                       NULL,

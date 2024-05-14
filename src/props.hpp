@@ -10,6 +10,7 @@ struct Props {
         last_n_id,
         secure_id,
         async_sink_id,
+        verbose_id,
         // libjitsimeet config
         libws_loglevel_bitmap_id,
         dump_websocket_packets_id,
@@ -26,6 +27,7 @@ struct Props {
     int         last_n     = 0;
     bool        secure     = true;
     bool        async_sink = false;
+    bool        verbose    = false;
 
     auto ensure_required_prop() const -> bool;
     auto handle_set_prop(const guint id, const GValue* value, GParamSpec* spec) -> bool;
