@@ -189,13 +189,10 @@ auto rtpbin_new_jitterbuffer_handler(GstElement* const rtpbin, GstElement* const
         PRINT("enabling RTX");
     }
 
-    // TODO
-    constexpr auto buffer_latency_milliseconds = 200;
-
     g_object_set(jitterbuffer,
                  "do-retransmission", TRUE,
                  "drop-on-latency", TRUE,
-                 "latency", buffer_latency_milliseconds,
+                 "latency", self.props.jitterbuffer_latency,
                  NULL);
 }
 

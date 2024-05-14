@@ -12,6 +12,7 @@ struct Props {
         audio_codec_type_id,
         video_codec_type_id,
         last_n_id,
+        jitterbuffer_latency_id,
         secure_id,
         async_sink_id,
         verbose_id,
@@ -30,7 +31,8 @@ struct Props {
     std::string room_name;
     CodecType   audio_codec_type;
     CodecType   video_codec_type;
-    int         last_n     = 0;
+    int         last_n = 0;
+    uint        jitterbuffer_latency;
     bool        secure     = true;
     bool        async_sink = false;
     bool        verbose    = false;

@@ -89,6 +89,9 @@ auto Props::handle_set_prop(const guint id, const GValue* const value, GParamSpe
     case last_n_id:
         last_n = g_value_get_int(value);
         return true;
+    case jitterbuffer_latency_id:
+        jitterbuffer_latency = g_value_get_uint(value);
+        return true;
     case secure_id:
         secure = g_value_get_boolean(value) == FALSE;
         return true;
@@ -156,6 +159,9 @@ auto Props::handle_get_prop(const guint id, GValue* const value, GParamSpec* con
         }
     case last_n_id:
         g_value_set_int(value, last_n);
+        return true;
+    case jitterbuffer_latency_id:
+        g_value_set_uint(value, jitterbuffer_latency);
         return true;
     case secure_id:
         g_value_set_boolean(value, !secure ? TRUE : FALSE);
@@ -232,6 +238,12 @@ auto Props::install_props(GObjectClass* const obj) -> void {
                                                       "Video codec to send",
                                                       video_codec_type_get_type(),
                                                       guint(VideoCodecType::H264),
+                                                      GParamFlags(G_PARAM_READWRITE | G_PARAM_CONSTRUCT)));
+    g_object_class_install_property(obj, jitterbuffer_latency_id,
+                                    g_param_spec_uint("jitterbuffer-latency",
+                                                      NULL,
+                                                      "Jitterbuffer latency in milliseconds",
+                                                      0, std::numeric_limits<uint>::max(), 200,
                                                       GParamFlags(G_PARAM_READWRITE | G_PARAM_CONSTRUCT)));
     g_object_class_install_property(obj, last_n_id,
                                     g_param_spec_int("receive-limit",
