@@ -161,6 +161,7 @@ auto run() -> bool {
                  "room", "room",
                  "receive-limit", 3,
                  "force-play", TRUE,
+                 "insecure", TRUE,
                  NULL);
 
     assert_b(gst_element_link_pads(&videotestsrc, NULL, &tee, NULL) == TRUE);
