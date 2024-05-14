@@ -612,7 +612,7 @@ auto wait_for_jingle_and_setup_pipeline(RealSelf& self, const CodecType audio_co
     const auto accept_iq = xmpp::elm::iq.clone()
                                .append_attrs({
                                    {"from", self.jid.as_full()},
-                                   {"to", self.conference->muc_local_focus_jid.as_full()},
+                                   {"to", self.conference->config.get_muc_local_focus_jid().as_full()},
                                    {"type", "set"},
                                })
                                .append_children({
@@ -729,7 +729,15 @@ auto null_to_ready(RealSelf& self) -> bool {
     callbacks->ws_conn        = self.ws_conn;
     callbacks->jingle_handler = jingle_handler;
     self.conference_callbacks.reset(callbacks);
-    self.conference = conference::Conference::create(self.props.room_name, self.jid, callbacks);
+    self.conference = conference::Conference::create(
+        conference::Config{
+            .jid              = self.jid,
+            .room             = self.props.room_name,
+            .video_codec_type = CodecType::H264,
+            .audio_muted      = false,
+            .video_muted      = false,
+        },
+        callbacks);
     ws::add_receiver(self.ws_conn, [&self](const std::span<std::byte> data) -> ws::ReceiverResult {
         // feed_payload always returns true in current implementation
         self.conference->feed_payload(std::string_view((char*)data.data(), data.size()));
