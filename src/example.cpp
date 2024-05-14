@@ -169,6 +169,7 @@ auto run() -> bool {
     g_object_set(&jitsibin,
                  "server", "jitsi.local",
                  "room", "room",
+                 "nick", "gstjitsimeet-example",
                  "receive-limit", 3,
                  "force-play", TRUE,
                  "insecure", TRUE,

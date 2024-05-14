@@ -64,6 +64,9 @@ auto Props::handle_set_prop(const guint id, const GValue* const value, GParamSpe
     case room_name_id:
         room_name = g_value_get_string(value);
         return true;
+    case nick_id:
+        nick = g_value_get_string(value);
+        return true;
     case audio_codec_type_id:
         switch(AudioCodecType(g_value_get_enum(value))) {
         case AudioCodecType::Opus:
@@ -134,6 +137,9 @@ auto Props::handle_get_prop(const guint id, GValue* const value, GParamSpec* con
         return true;
     case room_name_id:
         g_value_set_string(value, room_name.data());
+        return true;
+    case nick_id:
+        g_value_set_string(value, nick.data());
         return true;
     case audio_codec_type_id:
         switch(audio_codec_type) {
@@ -224,6 +230,14 @@ auto Props::install_props(GObjectClass* const obj) -> void {
                             "Room name of the conference",
                             NULL,
                             rw));
+
+    g_object_class_install_property(
+        obj, nick_id,
+        g_param_spec_string("nick",
+                            NULL,
+                            "Nick name of this participant",
+                            "gstjitsimeet",
+                            rw_construct));
 
     g_object_class_install_property(
         obj, audio_codec_type_id,

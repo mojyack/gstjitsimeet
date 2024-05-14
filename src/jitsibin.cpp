@@ -723,7 +723,7 @@ auto null_to_ready(RealSelf& self) -> bool {
         conference::Config{
             .jid              = self.jid,
             .room             = self.props.room_name,
-            .nick             = "gstjitsimeet-example",
+            .nick             = self.props.nick,
             .video_codec_type = self.props.video_codec_type,
             .audio_muted      = false,
             .video_muted      = false,

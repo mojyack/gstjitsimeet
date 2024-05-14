@@ -9,6 +9,7 @@ struct Props {
     enum {
         server_address_id = 1,
         room_name_id,
+        nick_id,
         audio_codec_type_id,
         video_codec_type_id,
         last_n_id,
@@ -29,6 +30,7 @@ struct Props {
 
     std::string server_address;
     std::string room_name;
+    std::string nick;
     CodecType   audio_codec_type;
     CodecType   video_codec_type;
     int         last_n;
