@@ -733,7 +733,8 @@ auto null_to_ready(RealSelf& self) -> bool {
         conference::Config{
             .jid              = self.jid,
             .room             = self.props.room_name,
-            .video_codec_type = CodecType::H264,
+            .nick             = "gstjitsimeet-example",
+            .video_codec_type = video_codec_type,
             .audio_muted      = false,
             .video_muted      = false,
         },
