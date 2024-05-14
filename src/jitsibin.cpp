@@ -202,10 +202,6 @@ auto rtpbin_new_jitterbuffer_handler(GstElement* const rtpbin, GstElement* const
 auto aux_handler_create_pt_map(const std::span<const Codec> codecs) -> AutoGstStructure {
     auto pt_map = AutoGstStructure(gst_structure_new_empty("application/x-rtp-pt-map"));
     for(const auto& codec : codecs) {
-        // FIXME: remove this check
-        if(codec.type == CodecType::Opus) {
-            continue;
-        }
         if(codec.rtx_pt == -1) {
             continue;
         }
