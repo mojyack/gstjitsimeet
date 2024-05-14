@@ -199,74 +199,85 @@ auto Props::handle_get_prop(const guint id, GValue* const value, GParamSpec* con
 }
 
 auto Props::install_props(GObjectClass* const obj) -> void {
+    constexpr auto rw           = GParamFlags(G_PARAM_READWRITE);
+    constexpr auto rw_construct = GParamFlags(G_PARAM_READWRITE | G_PARAM_CONSTRUCT);
+
     const auto bool_prop = [obj](const int         id,
                                  const char* const name,
                                  const char* const desc,
-                                 const gboolean    def,
-                                 const bool        init) -> void {
-        const auto flag = init ? GParamFlags(G_PARAM_READWRITE | G_PARAM_CONSTRUCT) : GParamFlags(G_PARAM_READWRITE);
-        g_object_class_install_property(obj, id,
-                                        g_param_spec_boolean(name,
-                                                             NULL,
-                                                             desc,
-                                                             def,
-                                                             flag));
+                                 const gboolean    def) -> void {
+        g_object_class_install_property(obj, id, g_param_spec_boolean(name, NULL, desc, def, rw_construct));
     };
 
-    g_object_class_install_property(obj, server_address_id,
-                                    g_param_spec_string("server",
-                                                        NULL,
-                                                        "FQDN of jitsi meet server",
-                                                        NULL,
-                                                        GParamFlags(G_PARAM_READWRITE)));
-    g_object_class_install_property(obj, room_name_id,
-                                    g_param_spec_string("room",
-                                                        NULL,
-                                                        "Room name of the conference",
-                                                        NULL,
-                                                        GParamFlags(G_PARAM_READWRITE)));
-    g_object_class_install_property(obj, audio_codec_type_id,
-                                    g_param_spec_enum("audio-codec",
-                                                      NULL,
-                                                      "Audio codec to send",
-                                                      audio_codec_type_get_type(),
-                                                      guint(AudioCodecType::Opus),
-                                                      GParamFlags(G_PARAM_READWRITE | G_PARAM_CONSTRUCT)));
-    g_object_class_install_property(obj, video_codec_type_id,
-                                    g_param_spec_enum("video-codec",
-                                                      NULL,
-                                                      "Video codec to send",
-                                                      video_codec_type_get_type(),
-                                                      guint(VideoCodecType::H264),
-                                                      GParamFlags(G_PARAM_READWRITE | G_PARAM_CONSTRUCT)));
-    g_object_class_install_property(obj, jitterbuffer_latency_id,
-                                    g_param_spec_uint("jitterbuffer-latency",
-                                                      NULL,
-                                                      "Jitterbuffer latency in milliseconds",
-                                                      0, std::numeric_limits<uint>::max(), 200,
-                                                      GParamFlags(G_PARAM_READWRITE | G_PARAM_CONSTRUCT)));
-    g_object_class_install_property(obj, last_n_id,
-                                    g_param_spec_int("receive-limit",
-                                                     NULL,
-                                                     "Maximum number of participants to receive streams from (-1 for unlimit)",
-                                                     -1, std::numeric_limits<int>::max(), 0,
-                                                     GParamFlags(G_PARAM_READWRITE | G_PARAM_CONSTRUCT)));
-    bool_prop(secure_id, "insecure", "Trust server self-signed certification", FALSE, true);
-    bool_prop(async_sink_id, "force-play", "Force pipeline to play even in conference with no participants", FALSE, true);
-    bool_prop(verbose_id, "verbose", "Enable debug messages", FALSE, true);
-    g_object_class_install_property(obj, libws_loglevel_bitmap_id,
-                                    g_param_spec_uint("lws-loglevel-bitmap",
-                                                      NULL,
-                                                      "libwebsockets lws_set_log_level value",
-                                                      0, std::numeric_limits<int>::max(), 0b11, // LLL_ERR | LLL_WARN
-                                                      GParamFlags(G_PARAM_READWRITE | G_PARAM_CONSTRUCT)));
-    bool_prop(dump_websocket_packets_id, "dump-websocket-packets", "Print websocket packets", FALSE, true);
-    bool_prop(debug_websocket_id, "debug-websocket", "Enable websocket debug messages", FALSE, true);
-    bool_prop(debug_xmpp_connection_id, "debug-xmpp-negotiation", "Enable xmpp negotiator debug messages", FALSE, true);
-    bool_prop(debug_conference_id, "debug-conference", "Enable conference debug messages", FALSE, true);
-    bool_prop(debug_jingle_handler_id, "debug-jingle", "Enable jingle debug messages", FALSE, true);
-    bool_prop(debug_ice_id, "debug-ice", "Enable ice debug messages", FALSE, true);
-    bool_prop(debug_colibri_id, "debug-colibri", "Enable colibri debug messages", FALSE, true);
+    g_object_class_install_property(
+        obj, server_address_id,
+        g_param_spec_string("server",
+                            NULL,
+                            "FQDN of jitsi meet server",
+                            NULL,
+                            rw));
+
+    g_object_class_install_property(
+        obj, room_name_id,
+        g_param_spec_string("room",
+                            NULL,
+                            "Room name of the conference",
+                            NULL,
+                            rw));
+
+    g_object_class_install_property(
+        obj, audio_codec_type_id,
+        g_param_spec_enum("audio-codec",
+                          NULL,
+                          "Audio codec to send",
+                          audio_codec_type_get_type(),
+                          guint(AudioCodecType::Opus),
+                          rw_construct));
+
+    g_object_class_install_property(
+        obj, video_codec_type_id,
+        g_param_spec_enum("video-codec",
+                          NULL,
+                          "Video codec to send",
+                          video_codec_type_get_type(),
+                          guint(VideoCodecType::H264),
+                          rw_construct));
+
+    g_object_class_install_property(
+        obj, jitterbuffer_latency_id,
+        g_param_spec_uint("jitterbuffer-latency",
+                          NULL,
+                          "Jitterbuffer latency in milliseconds",
+                          0, std::numeric_limits<uint>::max(), 200,
+                          rw_construct));
+
+    g_object_class_install_property(
+        obj, last_n_id,
+        g_param_spec_int("receive-limit",
+                         NULL,
+                         "Maximum number of participants to receive streams from (-1 for unlimit)",
+                         -1, std::numeric_limits<int>::max(), 0,
+                         rw_construct));
+
+    bool_prop(secure_id, "insecure", "Trust server self-signed certification", FALSE);
+    bool_prop(async_sink_id, "force-play", "Force pipeline to play even in conference with no participants", FALSE);
+    bool_prop(verbose_id, "verbose", "Enable debug messages", FALSE);
+
+    g_object_class_install_property(
+        obj, libws_loglevel_bitmap_id,
+        g_param_spec_uint("lws-loglevel-bitmap",
+                          NULL,
+                          "libwebsockets lws_set_log_level value",
+                          0, std::numeric_limits<int>::max(), 0b11, // LLL_ERR | LLL_WARN
+                          rw_construct));
+
+    bool_prop(dump_websocket_packets_id, "dump-websocket-packets", "Print websocket packets", FALSE);
+    bool_prop(debug_websocket_id, "debug-websocket", "Enable websocket debug messages", FALSE);
+    bool_prop(debug_xmpp_connection_id, "debug-xmpp-negotiation", "Enable xmpp negotiator debug messages", FALSE);
+    bool_prop(debug_conference_id, "debug-conference", "Enable conference debug messages", FALSE);
+    bool_prop(debug_jingle_handler_id, "debug-jingle", "Enable jingle debug messages", FALSE);
+    bool_prop(debug_ice_id, "debug-ice", "Enable ice debug messages", FALSE);
+    bool_prop(debug_colibri_id, "debug-colibri", "Enable colibri debug messages", FALSE);
 
     gst_type_mark_as_plugin_api(audio_codec_type_get_type(), GstPluginAPIFlags(0));
     gst_type_mark_as_plugin_api(video_codec_type_get_type(), GstPluginAPIFlags(0));
