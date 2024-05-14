@@ -31,11 +31,11 @@ struct Props {
     std::string room_name;
     CodecType   audio_codec_type;
     CodecType   video_codec_type;
-    int         last_n = 0;
+    int         last_n;
     uint        jitterbuffer_latency;
-    bool        secure     = true;
-    bool        async_sink = false;
-    bool        verbose    = false;
+    bool        secure;
+    bool        async_sink;
+    bool        verbose;
 
     auto ensure_required_prop() const -> bool;
     auto handle_set_prop(const guint id, const GValue* value, GParamSpec* spec) -> bool;
