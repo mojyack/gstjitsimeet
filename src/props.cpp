@@ -1,6 +1,54 @@
-#include "props.hpp"
+#include <gst/gstutils.h>
+
 #include "jitsi/assert.hpp"
 #include "jitsi/config.hpp"
+#include "props.hpp"
+
+namespace {
+enum class AudioCodecType {
+    Opus = 1,
+};
+
+enum class VideoCodecType {
+    H264 = 1,
+    Vp8,
+    Vp9,
+};
+
+auto audio_codec_type_get_type() -> GType {
+    static auto type = GType(0);
+    if(type != 0) {
+        return type;
+    }
+
+    static const auto value = std::array{
+        GEnumValue{static_cast<guint>(AudioCodecType::Opus), "opus", "Opus"},
+        GEnumValue{0, NULL, NULL},
+    };
+
+    type = g_enum_register_static("AudioCodecType", value.data());
+
+    return type;
+}
+
+auto video_codec_type_get_type() -> GType {
+    static auto type = GType(0);
+    if(type != 0) {
+        return type;
+    }
+
+    static const auto value = std::array{
+        GEnumValue{static_cast<guint>(VideoCodecType::H264), "h264", "H.264"},
+        GEnumValue{static_cast<guint>(VideoCodecType::Vp8), "vp8", "VP8"},
+        GEnumValue{static_cast<guint>(VideoCodecType::Vp9), "vp9", "VP9"},
+        GEnumValue{0, NULL, NULL},
+    };
+
+    type = g_enum_register_static("VideoCodecType", value.data());
+
+    return type;
+}
+} // namespace
 
 auto Props::ensure_required_prop() const -> bool {
     assert_b(!server_address.empty(), "please set server");
@@ -16,6 +64,28 @@ auto Props::handle_set_prop(const guint id, const GValue* const value, GParamSpe
     case room_name_id:
         room_name = g_value_get_string(value);
         return true;
+    case audio_codec_type_id:
+        switch(AudioCodecType(g_value_get_enum(value))) {
+        case AudioCodecType::Opus:
+            audio_codec_type = CodecType::Opus;
+            return true;
+        default:
+            return false;
+        }
+    case video_codec_type_id:
+        switch(VideoCodecType(g_value_get_enum(value))) {
+        case VideoCodecType::H264:
+            video_codec_type = CodecType::H264;
+            return true;
+        case VideoCodecType::Vp8:
+            video_codec_type = CodecType::Vp8;
+            return true;
+        case VideoCodecType::Vp9:
+            video_codec_type = CodecType::Vp9;
+            return true;
+        default:
+            return false;
+        }
     case last_n_id:
         last_n = g_value_get_int(value);
         return true;
@@ -62,6 +132,28 @@ auto Props::handle_get_prop(const guint id, GValue* const value, GParamSpec* con
     case room_name_id:
         g_value_set_string(value, room_name.data());
         return true;
+    case audio_codec_type_id:
+        switch(audio_codec_type) {
+        case CodecType::Opus:
+            g_value_set_enum(value, gint(AudioCodecType::Opus));
+            return true;
+        default:
+            return false;
+        }
+    case video_codec_type_id:
+        switch(video_codec_type) {
+        case CodecType::H264:
+            g_value_set_enum(value, gint(CodecType::H264));
+            return true;
+        case CodecType::Vp8:
+            g_value_set_enum(value, gint(CodecType::Vp8));
+            return true;
+        case CodecType::Vp9:
+            g_value_set_enum(value, gint(CodecType::Vp9));
+            return true;
+        default:
+            return false;
+        }
     case last_n_id:
         g_value_set_int(value, last_n);
         return true;
@@ -127,6 +219,20 @@ auto Props::install_props(GObjectClass* const obj) -> void {
                                                         "Room name of the conference",
                                                         NULL,
                                                         GParamFlags(G_PARAM_READWRITE)));
+    g_object_class_install_property(obj, audio_codec_type_id,
+                                    g_param_spec_enum("audio-codec",
+                                                      NULL,
+                                                      "Audio codec to send",
+                                                      audio_codec_type_get_type(),
+                                                      guint(AudioCodecType::Opus),
+                                                      GParamFlags(G_PARAM_READWRITE | G_PARAM_CONSTRUCT)));
+    g_object_class_install_property(obj, video_codec_type_id,
+                                    g_param_spec_enum("video-codec",
+                                                      NULL,
+                                                      "Video codec to send",
+                                                      video_codec_type_get_type(),
+                                                      guint(VideoCodecType::H264),
+                                                      GParamFlags(G_PARAM_READWRITE | G_PARAM_CONSTRUCT)));
     g_object_class_install_property(obj, last_n_id,
                                     g_param_spec_int("receive-limit",
                                                      NULL,
@@ -149,4 +255,7 @@ auto Props::install_props(GObjectClass* const obj) -> void {
     bool_prop(debug_jingle_handler_id, "debug-jingle", "Enable jingle debug messages", FALSE, true);
     bool_prop(debug_ice_id, "debug-ice", "Enable ice debug messages", FALSE, true);
     bool_prop(debug_colibri_id, "debug-colibri", "Enable colibri debug messages", FALSE, true);
+
+    gst_type_mark_as_plugin_api(audio_codec_type_get_type(), GstPluginAPIFlags(0));
+    gst_type_mark_as_plugin_api(video_codec_type_get_type(), GstPluginAPIFlags(0));
 }

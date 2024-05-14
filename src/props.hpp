@@ -3,10 +3,14 @@
 
 #include <glib-object.h>
 
+#include "jitsi/codec-type.hpp"
+
 struct Props {
     enum {
         server_address_id = 1,
         room_name_id,
+        audio_codec_type_id,
+        video_codec_type_id,
         last_n_id,
         secure_id,
         async_sink_id,
@@ -24,6 +28,8 @@ struct Props {
 
     std::string server_address;
     std::string room_name;
+    CodecType   audio_codec_type;
+    CodecType   video_codec_type;
     int         last_n     = 0;
     bool        secure     = true;
     bool        async_sink = false;
