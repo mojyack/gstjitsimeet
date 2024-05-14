@@ -140,6 +140,7 @@ auto run() -> bool {
     /*
      * videotestsrc -> tee -> waylandsink
      *                     -> videoconvert -> x264enc -> jitisbin
+     * audiotestsrc ->                        opusenc ->
      */
 
     unwrap_pb_mut(videotestsrc, add_new_element_to_pipeine(pipeline.get(), "videotestsrc"));
@@ -147,6 +148,8 @@ auto run() -> bool {
     unwrap_pb_mut(waylandsink, add_new_element_to_pipeine(pipeline.get(), "waylandsink"));
     unwrap_pb_mut(videoconvert, add_new_element_to_pipeine(pipeline.get(), "videoconvert"));
     unwrap_pb_mut(x264enc, add_new_element_to_pipeine(pipeline.get(), "x264enc"));
+    unwrap_pb_mut(audiotestsrc, add_new_element_to_pipeine(pipeline.get(), "audiotestsrc"));
+    unwrap_pb_mut(opusenc, add_new_element_to_pipeine(pipeline.get(), "opusenc"));
     unwrap_pb_mut(jitsibin, add_new_element_to_pipeine(pipeline.get(), "jitsibin"));
     g_signal_connect(&jitsibin, "pad-added", G_CALLBACK(jitsibin_pad_added_handler), &context);
     g_signal_connect(&jitsibin, "pad-removed", G_CALLBACK(jitsibin_pad_removed_handler), &context);
@@ -155,6 +158,13 @@ auto run() -> bool {
 
     g_object_set(&waylandsink,
                  "async", FALSE,
+                 NULL);
+    g_object_set(&videotestsrc,
+                 "is-live", TRUE,
+                 NULL);
+    g_object_set(&audiotestsrc,
+                 "is-live", TRUE,
+                 "wave", 8,
                  NULL);
     g_object_set(&jitsibin,
                  "server", "jitsi.local",
@@ -168,7 +178,9 @@ auto run() -> bool {
     assert_b(gst_element_link_pads(&tee, NULL, &waylandsink, NULL) == TRUE);
     assert_b(gst_element_link_pads(&tee, NULL, &videoconvert, NULL) == TRUE);
     assert_b(gst_element_link_pads(&videoconvert, NULL, &x264enc, NULL) == TRUE);
-    assert_b(gst_element_link_pads(&x264enc, NULL, &jitsibin, NULL) == TRUE);
+    assert_b(gst_element_link_pads(&x264enc, NULL, &jitsibin, "video_sink") == TRUE);
+    assert_b(gst_element_link_pads(&audiotestsrc, NULL, &opusenc, NULL) == TRUE);
+    assert_b(gst_element_link_pads(&opusenc, NULL, &jitsibin, "audio_sink") == TRUE);
 
     return run_pipeline(pipeline.get());
 }

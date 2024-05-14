@@ -40,10 +40,14 @@ struct RealSelf {
     Props props;
 
     // for unblocking setup
-    GstPad*     sink_pad;
-    GstElement* stub_sink;
-    GstElement* real_sink;
-    std::thread session_initiate_jingle_wait_thread;
+    struct SinkElements {
+        GstPad*     sink_pad;  // ghostpad of jitsibin
+        GstElement* stub_sink; // fakesink
+        GstElement* real_sink; // videopay/audiopay
+    };
+    SinkElements video_sink_elements;
+    SinkElements audio_sink_elements;
+    std::thread  session_initiate_jingle_wait_thread;
 };
 
 namespace {
@@ -514,37 +518,45 @@ auto construct_sub_pipeline(RealSelf& self, const CodecType audio_codec_type, co
     assert_b(gst_element_link_pads(nicesrc, NULL, dtlssrtpdec, NULL) == TRUE);
     assert_b(gst_element_link_pads(dtlssrtpenc, "src", nicesink, "sink") == TRUE);
 
-    self.real_sink = video_pay;
+    self.audio_sink_elements.real_sink = audio_pay;
+    self.video_sink_elements.real_sink = video_pay;
 
     return true;
 }
 
-auto replace_stub_sink_with_real_sink(RealSelf& self, bool callbacked = false) -> bool;
+auto replace_stub_sink_with_real_sink(RealSelf& self, RealSelf::SinkElements* elements = nullptr) -> bool;
 
 auto jitsibin_sink_block_callback(GstPad* const pad, GstPadProbeInfo* const info, gpointer const data) -> GstPadProbeReturn {
     auto& self = *std::bit_cast<RealSelf*>(data);
-    replace_stub_sink_with_real_sink(self, true);
+    if(pad == self.audio_sink_elements.sink_pad) {
+        replace_stub_sink_with_real_sink(self, &self.audio_sink_elements);
+    } else if(pad == self.video_sink_elements.sink_pad) {
+        replace_stub_sink_with_real_sink(self, &self.video_sink_elements);
+    } else {
+        PANIC("sink block callback bug");
+    }
     return GST_PAD_PROBE_REMOVE;
 }
 
-auto replace_stub_sink_with_real_sink(RealSelf& self, bool callbacked) -> bool {
-    if(!callbacked) {
+auto replace_stub_sink_with_real_sink(RealSelf& self, RealSelf::SinkElements* const elements) -> bool {
+    if(elements == nullptr) {
         // real work must be done in the pad block callback
-        gst_pad_add_probe(self.sink_pad, GST_PAD_PROBE_TYPE_BLOCK_DOWNSTREAM, jitsibin_sink_block_callback, &self, NULL);
+        gst_pad_add_probe(self.audio_sink_elements.sink_pad, GST_PAD_PROBE_TYPE_BLOCK_DOWNSTREAM, jitsibin_sink_block_callback, &self, NULL);
+        gst_pad_add_probe(self.video_sink_elements.sink_pad, GST_PAD_PROBE_TYPE_BLOCK_DOWNSTREAM, jitsibin_sink_block_callback, &self, NULL);
         return true;
     }
 
     // now the sink pad is in blocked state, safe to modify.
 
     // remove stub sink
-    assert_b(gst_element_set_state(self.stub_sink, GST_STATE_NULL) == GST_STATE_CHANGE_SUCCESS);
-    assert_b(call_vfunc(self, remove_element, self.stub_sink) == TRUE);
-    self.stub_sink = nullptr;
+    assert_b(gst_element_set_state(elements->stub_sink, GST_STATE_NULL) == GST_STATE_CHANGE_SUCCESS);
+    assert_b(call_vfunc(self, remove_element, elements->stub_sink) == TRUE);
+    elements->stub_sink = nullptr;
 
     // link real sink to ghostpad
-    const auto target_sink_pad = AutoGstObject(gst_element_get_static_pad(self.real_sink, "sink"));
-    assert_b(target_sink_pad.get() != NULL);
-    assert_b(gst_ghost_pad_set_target(GST_GHOST_PAD(self.sink_pad), target_sink_pad.get()) == TRUE);
+    const auto real_sink_pad = AutoGstObject(gst_element_get_static_pad(elements->real_sink, "sink"));
+    assert_b(real_sink_pad.get() != NULL);
+    assert_b(gst_ghost_pad_set_target(GST_GHOST_PAD(elements->sink_pad), real_sink_pad.get()) == TRUE);
 
     // sync state
     assert_b(gst_bin_sync_children_states(self.bin) == TRUE);
@@ -553,18 +565,21 @@ auto replace_stub_sink_with_real_sink(RealSelf& self, bool callbacked) -> bool {
 }
 
 auto setup_stub_pipeline(RealSelf& self) -> bool {
-    auto fakesink = gst_element_factory_make("fakesink", NULL);
-    assert_b(fakesink != NULL, "failed to create fakesink");
-    g_object_set(fakesink,
-                 "async", FALSE,
-                 NULL);
-    assert_b(call_vfunc(self, add_element, fakesink) == TRUE);
-    self.stub_sink = fakesink;
+    for(auto i = 0; i < 2; i += 1) {
+        const auto elements = i == 0 ? &self.audio_sink_elements : &self.video_sink_elements;
+        auto       fakesink = gst_element_factory_make("fakesink", NULL);
+        assert_b(fakesink != NULL, "failed to create fakesink");
+        g_object_set(fakesink,
+                     "async", FALSE,
+                     NULL);
+        assert_b(call_vfunc(self, add_element, fakesink) == TRUE);
+        elements->stub_sink = fakesink;
 
-    // link stub sink to ghostpad
-    const auto fakesink_sink_pad = AutoGstObject(gst_element_get_static_pad(fakesink, "sink"));
-    assert_b(fakesink_sink_pad.get() != NULL);
-    assert_b(gst_ghost_pad_set_target(GST_GHOST_PAD(self.sink_pad), fakesink_sink_pad.get()) == TRUE);
+        // link stub sink to ghostpad
+        const auto fakesink_sink_pad = AutoGstObject(gst_element_get_static_pad(fakesink, "sink"));
+        assert_b(fakesink_sink_pad.get() != NULL);
+        assert_b(gst_ghost_pad_set_target(GST_GHOST_PAD(elements->sink_pad), fakesink_sink_pad.get()) == TRUE);
+    }
 
     return true;
 }
@@ -595,9 +610,12 @@ auto wait_for_jingle_and_setup_pipeline(RealSelf& self, const CodecType audio_co
         // we are in main thread
         // the ghostpad has no target
         // link real sink to ghostpad
-        const auto real_sink_pad = AutoGstObject(gst_element_get_static_pad(self.real_sink, "sink"));
-        assert_b(real_sink_pad.get() != NULL);
-        assert_b(gst_ghost_pad_set_target(GST_GHOST_PAD(self.sink_pad), real_sink_pad.get()) == TRUE);
+        for(auto i = 0; i < 2; i += 1) {
+            const auto* elements      = i == 0 ? &self.audio_sink_elements : &self.video_sink_elements;
+            const auto  real_sink_pad = AutoGstObject(gst_element_get_static_pad(elements->real_sink, "sink"));
+            assert_b(real_sink_pad.get() != NULL);
+            assert_b(gst_ghost_pad_set_target(GST_GHOST_PAD(elements->sink_pad), real_sink_pad.get()) == TRUE);
+        }
     }
 
     // send jingle accept
@@ -786,9 +804,14 @@ auto gst_jitsibin_init(GstJitsiBin* jitsibin) -> void {
 
     auto& self = *jitsibin->real_self;
 
-    unwrap_pn_mut(jitsibin_sink, gst_ghost_pad_new_no_target("sink", GST_PAD_SINK));
-    assert_n(gst_element_add_pad(GST_ELEMENT(self.bin), &jitsibin_sink) == TRUE);
-    self.sink_pad = &jitsibin_sink;
+    // audio sink
+    unwrap_pn_mut(jitsibin_audio_sink, gst_ghost_pad_new_no_target("audio_sink", GST_PAD_SINK));
+    assert_n(gst_element_add_pad(GST_ELEMENT(self.bin), &jitsibin_audio_sink) == TRUE);
+    self.audio_sink_elements.sink_pad = &jitsibin_audio_sink;
+    // video sink
+    unwrap_pn_mut(jitsibin_video_sink, gst_ghost_pad_new_no_target("video_sink", GST_PAD_SINK));
+    assert_n(gst_element_add_pad(GST_ELEMENT(self.bin), &jitsibin_video_sink) == TRUE);
+    self.video_sink_elements.sink_pad = &jitsibin_video_sink;
 
     return;
 }
