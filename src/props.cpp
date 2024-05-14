@@ -1,3 +1,4 @@
+#include <array>
 #include <gst/gstutils.h>
 
 #include "jitsi/assert.hpp"

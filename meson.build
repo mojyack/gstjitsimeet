@@ -29,6 +29,11 @@ executable('example',
         dependencies: [gstreamer_dep]
 ) 
 
+executable('two-room-example', 
+        files('src/two-room-example.cpp'),
+        dependencies: [gstreamer_dep]
+) 
+
 # TODO: remove this example
 executable('dynamic-switch-example', 
         files('src/dynamic-switch-example.cpp'),

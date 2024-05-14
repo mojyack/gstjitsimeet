@@ -168,11 +168,12 @@ auto run() -> bool {
                  NULL);
     g_object_set(&jitsibin,
                  "server", "jitsi.local",
-                 "room", "room",
+                 "room", "sink",
                  "nick", "gstjitsimeet-example",
                  "receive-limit", 3,
                  "force-play", TRUE,
                  "insecure", TRUE,
+                 "dump-websocket-packets", TRUE,
                  NULL);
 
     assert_b(gst_element_link_pads(&videotestsrc, NULL, &tee, NULL) == TRUE);

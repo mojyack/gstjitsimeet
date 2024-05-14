@@ -6,6 +6,7 @@
 #include <gst/rtp/gstrtphdrext.h>
 
 #include "auto-gst-object.hpp"
+#include "jitsi/array-util.hpp"
 #include "jitsi/autoptr.hpp"
 #include "jitsi/colibri.hpp"
 #include "jitsi/conference.hpp"
