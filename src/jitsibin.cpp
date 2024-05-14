@@ -364,7 +364,7 @@ auto rtpbin_pad_added_handler(GstElement* const rtpbin, GstPad* const pad, gpoin
     return;
 }
 
-auto construct_sub_pipeline(RealSelf& self, const CodecType audio_codec_type, const CodecType video_codec_type) -> bool {
+auto construct_sub_pipeline(RealSelf& self) -> bool {
     static auto serial_num     = std::atomic_int(0);
     const auto& jingle_session = self.jingle_handler->get_session();
 
@@ -426,15 +426,15 @@ auto construct_sub_pipeline(RealSelf& self, const CodecType audio_codec_type, co
     assert_b(call_vfunc(self, add_element, dtlssrtpdec) == TRUE);
 
     // audio payloader
-    unwrap_pb(audio_codec, jingle_session.find_codec_by_type(audio_codec_type));
-    unwrap_pb(audio_pay_name, codec_type_to_payloader_name.find(audio_codec_type));
+    unwrap_pb(audio_codec, jingle_session.find_codec_by_type(self.props.audio_codec_type));
+    unwrap_pb(audio_pay_name, codec_type_to_payloader_name.find(self.props.audio_codec_type));
     const auto audio_pay = gst_element_factory_make(audio_pay_name.second, NULL);
     assert_b(audio_pay != NULL, "failed to create audio payloader");
     g_object_set(audio_pay,
                  "pt", audio_codec.tx_pt,
                  "ssrc", jingle_session.audio_ssrc,
                  NULL);
-    switch(audio_codec_type) {
+    switch(self.props.audio_codec_type) {
     case CodecType::Opus:
         g_object_set(audio_pay,
                      "min-ptime", 10u * 1000 * 1000, // 10ms
@@ -453,15 +453,15 @@ auto construct_sub_pipeline(RealSelf& self, const CodecType audio_codec_type, co
     assert_b(call_vfunc(self, add_element, audio_pay) == TRUE);
 
     // video payloader
-    unwrap_pb(video_codec, jingle_session.find_codec_by_type(video_codec_type));
-    unwrap_pb(video_pay_name, codec_type_to_payloader_name.find(video_codec_type));
+    unwrap_pb(video_codec, jingle_session.find_codec_by_type(self.props.video_codec_type));
+    unwrap_pb(video_pay_name, codec_type_to_payloader_name.find(self.props.video_codec_type));
     const auto video_pay = gst_element_factory_make(video_pay_name.second, NULL);
     assert_b(video_pay != NULL, "failed to create video payloader");
     g_object_set(video_pay,
                  "pt", video_codec.tx_pt,
                  "ssrc", jingle_session.video_ssrc,
                  NULL);
-    switch(video_codec_type) {
+    switch(self.props.video_codec_type) {
     case CodecType::H264:
         g_object_set(video_pay,
                      "aggregate-mode", 1, // zero-latency
@@ -569,7 +569,7 @@ auto setup_stub_pipeline(RealSelf& self) -> bool {
     return true;
 }
 
-auto wait_for_jingle_and_setup_pipeline(RealSelf& self, const CodecType audio_codec_type, const CodecType video_codec_type) -> bool {
+auto wait_for_jingle_and_setup_pipeline(RealSelf& self) -> bool {
     // wait for jingle initiation
     self.session_initiate_jingle_arrived_event.wait();
 
@@ -583,7 +583,7 @@ auto wait_for_jingle_and_setup_pipeline(RealSelf& self, const CodecType audio_co
     if(self.props.verbose) {
         PRINT("creating pipeline");
     }
-    assert_b(construct_sub_pipeline(self, audio_codec_type, video_codec_type));
+    assert_b(construct_sub_pipeline(self));
 
     // expose real pipeline
     if(self.props.async_sink) {
@@ -683,9 +683,6 @@ struct ConferenceCallbacks : public conference::ConferenceCallbacks {
 auto null_to_ready(RealSelf& self) -> bool {
     assert_b(self.props.ensure_required_prop());
 
-    constexpr auto audio_codec_type = CodecType::Opus;
-    constexpr auto video_codec_type = CodecType::H264; // TODO
-
     const auto ws_path = std::string("xmpp-websocket?room=") + self.props.room_name;
     self.ws_conn       = ws::create_connection(self.props.server_address.data(), 443, ws_path.data(), self.props.secure);
 
@@ -712,8 +709,8 @@ auto null_to_ready(RealSelf& self) -> bool {
         self.extenal_services = std::move(negotiator->external_services);
     }
 
-    const auto jingle_handler = new JingleHandler(audio_codec_type,
-                                                  video_codec_type,
+    const auto jingle_handler = new JingleHandler(self.props.audio_codec_type,
+                                                  self.props.video_codec_type,
                                                   self.jid,
                                                   self.extenal_services,
                                                   &self.session_initiate_jingle_arrived_event);
@@ -730,7 +727,7 @@ auto null_to_ready(RealSelf& self) -> bool {
             .jid              = self.jid,
             .room             = self.props.room_name,
             .nick             = "gstjitsimeet-example",
-            .video_codec_type = video_codec_type,
+            .video_codec_type = self.props.video_codec_type,
             .audio_muted      = false,
             .video_muted      = false,
         },
@@ -749,11 +746,11 @@ auto null_to_ready(RealSelf& self) -> bool {
     if(self.props.async_sink) {
         assert_b(setup_stub_pipeline(self));
         // wait for jingle in another thread, in order to avoid blocking entire pipeline.
-        self.session_initiate_jingle_wait_thread = std::thread([&self, audio_codec_type, video_codec_type]() {
-            wait_for_jingle_and_setup_pipeline(self, audio_codec_type, video_codec_type);
+        self.session_initiate_jingle_wait_thread = std::thread([&self]() {
+            wait_for_jingle_and_setup_pipeline(self);
         });
     } else {
-        wait_for_jingle_and_setup_pipeline(self, audio_codec_type, video_codec_type);
+        wait_for_jingle_and_setup_pipeline(self);
     }
 
     return true;
