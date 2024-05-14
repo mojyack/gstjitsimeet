@@ -101,25 +101,31 @@ auto Props::handle_get_prop(const guint id, GValue* const value, GParamSpec* con
 }
 
 auto Props::install_props(GObjectClass* const obj) -> void {
-#define bool_prop(id, name, desc, default)                        \
-    g_object_class_install_property(obj, id,                      \
-                                    g_param_spec_boolean(name,    \
-                                                         NULL,    \
-                                                         desc,    \
-                                                         default, \
-                                                         GParamFlags(G_PARAM_READWRITE)));
+    const auto bool_prop = [obj](const int         id,
+                                 const char* const name,
+                                 const char* const desc,
+                                 const gboolean    def,
+                                 const bool        init) -> void {
+        const auto flag = init ? GParamFlags(G_PARAM_READWRITE | G_PARAM_CONSTRUCT) : GParamFlags(G_PARAM_READWRITE);
+        g_object_class_install_property(obj, id,
+                                        g_param_spec_boolean(name,
+                                                             NULL,
+                                                             desc,
+                                                             def,
+                                                             flag));
+    };
 
     g_object_class_install_property(obj, server_address_id,
                                     g_param_spec_string("server",
                                                         NULL,
                                                         "FQDN of jitsi meet server",
-                                                        "",
+                                                        NULL,
                                                         GParamFlags(G_PARAM_READWRITE)));
     g_object_class_install_property(obj, room_name_id,
                                     g_param_spec_string("room",
                                                         NULL,
                                                         "Room name of the conference",
-                                                        "",
+                                                        NULL,
                                                         GParamFlags(G_PARAM_READWRITE)));
     g_object_class_install_property(obj, last_n_id,
                                     g_param_spec_int("receive-limit",
@@ -127,19 +133,19 @@ auto Props::install_props(GObjectClass* const obj) -> void {
                                                      "Maximum number of participants to receive streams from (-1 for unlimit)",
                                                      -1, std::numeric_limits<int>::max(), 0,
                                                      GParamFlags(G_PARAM_READWRITE)));
-    bool_prop(secure_id, "insecure", "Trust server self-signed certification", FALSE);
-    bool_prop(async_sink_id, "force-play", "Force pipeline to play even in conference with no participants", FALSE);
+    bool_prop(secure_id, "insecure", "Trust server self-signed certification", FALSE, false);
+    bool_prop(async_sink_id, "force-play", "Force pipeline to play even in conference with no participants", FALSE, false);
     g_object_class_install_property(obj, libws_loglevel_bitmap_id,
                                     g_param_spec_uint("lws-loglevel-bitmap",
                                                       NULL,
                                                       "libwebsockets lws_set_log_level value",
                                                       0, std::numeric_limits<int>::max(), 0b11, // LLL_ERR | LLL_WARN
-                                                      GParamFlags(G_PARAM_READWRITE)));
-    bool_prop(dump_websocket_packets_id, "dump-websocket-packets", "Print websocket packets", FALSE);
-    bool_prop(debug_websocket_id, "debug-websocket", "Enable websocket debug messages", FALSE);
-    bool_prop(debug_xmpp_connection_id, "debug-xmpp-negotiation", "Enable xmpp negotiator debug messages", FALSE);
-    bool_prop(debug_conference_id, "debug-conference", "Enable conference debug messages", FALSE);
-    bool_prop(debug_jingle_handler_id, "debug-jingle", "Enable jingle debug messages", FALSE);
-    bool_prop(debug_ice_id, "debug-ice", "Enable ice debug messages", FALSE);
-    bool_prop(debug_colibri_id, "debug-colibri", "Enable colibri debug messages", FALSE);
+                                                      GParamFlags(G_PARAM_READWRITE | G_PARAM_CONSTRUCT)));
+    bool_prop(dump_websocket_packets_id, "dump-websocket-packets", "Print websocket packets", FALSE, true);
+    bool_prop(debug_websocket_id, "debug-websocket", "Enable websocket debug messages", FALSE, true);
+    bool_prop(debug_xmpp_connection_id, "debug-xmpp-negotiation", "Enable xmpp negotiator debug messages", FALSE, true);
+    bool_prop(debug_conference_id, "debug-conference", "Enable conference debug messages", FALSE, true);
+    bool_prop(debug_jingle_handler_id, "debug-jingle", "Enable jingle debug messages", FALSE, true);
+    bool_prop(debug_ice_id, "debug-ice", "Enable ice debug messages", FALSE, true);
+    bool_prop(debug_colibri_id, "debug-colibri", "Enable colibri debug messages", FALSE, true);
 }
