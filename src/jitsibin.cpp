@@ -15,6 +15,7 @@
 #include "jitsi/util/charconv.hpp"
 #include "jitsi/util/event.hpp"
 #include "jitsi/util/misc.hpp"
+#include "jitsi/util/timer-event.hpp"
 #include "jitsi/websocket.hpp"
 #include "jitsi/xmpp/elements.hpp"
 #include "jitsi/xmpp/negotiator.hpp"
@@ -34,6 +35,7 @@ struct RealSelf {
     std::unique_ptr<conference::Conference>          conference;
     std::unique_ptr<colibri::Colibri>                colibri;
     std::thread                                      pinger;
+    TimerEvent                                       pinger_finish_event;
     xmpp::Jid                                        jid;
     std::vector<xmpp::Service>                       extenal_services;
     Event                                            session_initiate_jingle_arrived_event;
@@ -619,7 +621,7 @@ auto wait_for_jingle_and_setup_pipeline(RealSelf& self) -> bool {
 
     // launch ping thread
     self.pinger = std::thread([&self]() {
-        while(true) {
+        while(!self.pinger_finish_event.wait_for(std::chrono::seconds(10))) {
             const auto iq = xmpp::elm::iq.clone()
                                 .append_attrs({
                                     {"type", "get"},
@@ -628,7 +630,6 @@ auto wait_for_jingle_and_setup_pipeline(RealSelf& self) -> bool {
                                     xmpp::elm::ping,
                                 });
             self.conference->send_iq(iq, {});
-            std::this_thread::sleep_for(std::chrono::seconds(10));
         }
     });
 
@@ -755,8 +756,12 @@ auto null_to_ready(RealSelf& self) -> bool {
 }
 
 auto ready_to_null(RealSelf& self) -> bool {
+    self.pinger_finish_event.wakeup();
+    self.pinger.join();
+    if(self.session_initiate_jingle_wait_thread.joinable()) {
+        self.session_initiate_jingle_wait_thread.join();
+    }
     ws::free_connection(self.ws_conn);
-    // TODO: finish pinger
     return true;
 }
 
