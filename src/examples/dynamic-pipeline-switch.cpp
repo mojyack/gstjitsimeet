@@ -4,9 +4,9 @@
 #include <gst/gst.h>
 #include <gst/video/gstvideodecoder.h>
 
-#include "auto-gst-object.hpp"
-#include "jitsi/autoptr.hpp"
-#include "jitsi/unwrap.hpp"
+#include "../auto-gst-object.hpp"
+#include "../jitsi/autoptr.hpp"
+#include "../jitsi/unwrap.hpp"
 
 namespace {
 declare_autoptr(GMainLoop, GMainLoop, g_main_loop_unref);

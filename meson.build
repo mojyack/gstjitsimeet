@@ -24,18 +24,18 @@ library('gstjitsimeet', src + libjitsimeet_src,
         install : true,
 )
 
-executable('example', 
-        files('src/example.cpp'),
+# examples
+executable('receiver-example', 
+        files('src/examples/receiver.cpp'),
         dependencies: [gstreamer_dep]
 ) 
-
-executable('two-room-example', 
-        files('src/two-room-example.cpp'),
+executable('room-to-room-example', 
+        files('src/examples/room-to-room.cpp'),
         dependencies: [gstreamer_dep]
 ) 
-
-# TODO: remove this example
-executable('dynamic-switch-example', 
-        files('src/dynamic-switch-example.cpp'),
+# TODO: move this example to another repository
+#       here is not a correct place for this, since this is unrelated to jitsi
+executable('dynamic-pipeline-switch-example', 
+        files('src/examples/dynamic-pipeline-switch.cpp'),
         dependencies: [gstreamer_dep]
 ) 
