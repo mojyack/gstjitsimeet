@@ -22,8 +22,6 @@
 #include "jitsibin.hpp"
 #include "props.hpp"
 
-#define GST_CAT_DEFAULT jitsibin_debug
-
 #define gst_jitsibin_parent_class parent_class
 G_DEFINE_TYPE(GstJitsiBin, gst_jitsibin, GST_TYPE_BIN);
 
@@ -54,8 +52,6 @@ struct RealSelf {
 };
 
 namespace {
-GST_DEBUG_CATEGORY_STATIC(jitsibin_debug);
-
 #define call_vfunc(self, func, ...) \
     GST_BIN_GET_CLASS(self.bin)->func(self.bin, __VA_ARGS__)
 
@@ -817,8 +813,6 @@ auto gst_jitsibin_finalize(GObject* object) -> void {
 }
 
 auto gst_jitsibin_class_init(GstJitsiBinClass* klass) -> void {
-    GST_DEBUG_CATEGORY_INIT(jitsibin_debug, "jitsibin", 0, "jitsibin");
-
     klass->participant_joined_signal = g_signal_new("participant-joined", G_TYPE_FROM_CLASS(klass), G_SIGNAL_RUN_FIRST, 0, NULL, NULL, NULL, G_TYPE_NONE, 2, G_TYPE_STRING, G_TYPE_STRING);
     klass->participant_left_signal   = g_signal_new("participant-left", G_TYPE_FROM_CLASS(klass), G_SIGNAL_RUN_FIRST, 0, NULL, NULL, NULL, G_TYPE_NONE, 2, G_TYPE_STRING, G_TYPE_STRING);
 
