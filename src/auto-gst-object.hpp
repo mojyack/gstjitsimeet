@@ -7,7 +7,9 @@ template <class T>
 struct AutoGstObject {
     struct Deleter {
         auto operator()(T* const ptr) -> void {
-            gst_object_unref(ptr);
+            if(ptr != NULL) {
+                gst_object_unref(ptr);
+            }
         }
     };
 
@@ -34,7 +36,9 @@ struct AutoGstObject {
     AutoGstObject() {}
 
     AutoGstObject(T* const ptr) : ptr(ptr) {
-        gst_object_ref_sink(ptr);
+        if(ptr != NULL) {
+            gst_object_ref_sink(ptr);
+        }
     }
 };
 
