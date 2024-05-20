@@ -94,8 +94,17 @@ auto jitsibin_pad_added_handler(GstElement* const jitsibin, GstPad* const pad, g
         assert_n(gst_element_link_pads(&videoconvert_wl, NULL, &waylandsink, NULL) == TRUE);
         assert_n(gst_element_link_pads(&tee, NULL, &videoconvert_enc, NULL) == TRUE);
         assert_n(gst_element_link_pads(&videoconvert_enc, NULL, &enc, NULL) == TRUE);
-
         assert_n(gst_element_link_pads(&enc, NULL, self.jitsibin_sink, "video_sink") == TRUE);
+
+        assert_n(gst_element_sync_state_with_parent(&enc) == TRUE);
+        assert_n(gst_element_sync_state_with_parent(&videoconvert_enc) == TRUE);
+        assert_n(gst_element_sync_state_with_parent(&waylandsink) == TRUE);
+        assert_n(gst_element_sync_state_with_parent(&videoconvert_wl) == TRUE);
+        assert_n(gst_element_sync_state_with_parent(&tee) == TRUE);
+        assert_n(gst_element_sync_state_with_parent(&capsfilter) == TRUE);
+        assert_n(gst_element_sync_state_with_parent(&videoscale) == TRUE);
+        assert_n(gst_element_sync_state_with_parent(&dec) == TRUE);
+
         connected = true;
         PRINT("video connected");
         return;
