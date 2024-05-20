@@ -1,9 +1,10 @@
 #include <array>
 #include <gst/gstutils.h>
 
-#include "jitsi/assert.hpp"
 #include "jitsi/config.hpp"
+#include "macros/assert.hpp"
 #include "props.hpp"
+#include "util/assert.hpp"
 
 namespace {
 enum class AudioCodecType {

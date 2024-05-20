@@ -1,8 +1,9 @@
 #include <gst/gst.h>
 
 #include "../auto-gst-object.hpp"
-#include "../jitsi/assert.hpp"
-#include "../jitsi/autoptr.hpp"
+#include "../macros/assert.hpp"
+#include "../macros/autoptr.hpp"
+#include "../util/assert.hpp"
 
 declare_autoptr(GstMessage, GstMessage, gst_message_unref);
 

@@ -5,8 +5,9 @@
 #include <gst/video/gstvideodecoder.h>
 
 #include "../auto-gst-object.hpp"
-#include "../jitsi/autoptr.hpp"
-#include "../jitsi/unwrap.hpp"
+#include "../macros/autoptr.hpp"
+#include "../macros/unwrap.hpp"
+#include "../util/assert.hpp"
 #include "helper.hpp"
 
 namespace {

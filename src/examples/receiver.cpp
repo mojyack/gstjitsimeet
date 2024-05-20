@@ -2,8 +2,8 @@
 #include <gst/video/gstvideodecoder.h>
 
 #include "../auto-gst-object.hpp"
-#include "../jitsi/autoptr.hpp"
-#include "../jitsi/unwrap.hpp"
+#include "../macros/autoptr.hpp"
+#include "../macros/unwrap.hpp"
 #include "../util/charconv.hpp"
 #include "../util/misc.hpp"
 #include "helper.hpp"

@@ -7,11 +7,9 @@
 
 #include "auto-gst-object.hpp"
 #include "jitsi/array-util.hpp"
-#include "jitsi/autoptr.hpp"
 #include "jitsi/colibri.hpp"
 #include "jitsi/conference.hpp"
 #include "jitsi/jingle-handler/jingle.hpp"
-#include "jitsi/unwrap.hpp"
 #include "jitsi/util/charconv.hpp"
 #include "jitsi/util/event.hpp"
 #include "jitsi/util/misc.hpp"
@@ -20,6 +18,8 @@
 #include "jitsi/xmpp/elements.hpp"
 #include "jitsi/xmpp/negotiator.hpp"
 #include "jitsibin.hpp"
+#include "macros/autoptr.hpp"
+#include "macros/unwrap.hpp"
 #include "props.hpp"
 
 #define gst_jitsibin_parent_class parent_class
