@@ -38,6 +38,8 @@ auto switch_fake_to_wayland(Context& self) -> bool {
     self.waylandsink  = &waylandsink;
     assert_b(gst_element_link_pads(self.videotestsrc, NULL, &videoconvert, NULL) == TRUE);
     assert_b(gst_element_link_pads(&videoconvert, NULL, &waylandsink, NULL) == TRUE);
+    assert_b(gst_element_sync_state_with_parent(&waylandsink) == TRUE);
+    assert_b(gst_element_sync_state_with_parent(&videoconvert) == TRUE);
     return true;
 }
 
@@ -53,6 +55,7 @@ auto switch_wayland_to_fake(Context& self) -> bool {
     unwrap_pb_mut(fakesink, add_new_element_to_pipeine(self.pipeline, "fakesink"));
     self.fakesink = &fakesink;
     assert_b(gst_element_link_pads(self.videotestsrc, NULL, &fakesink, NULL) == TRUE);
+    assert_b(gst_element_sync_state_with_parent(&fakesink) == TRUE);
     return true;
 }
 auto pad_block_callback(GstPad* const /*pad*/, GstPadProbeInfo* const /*info*/, gpointer const data) -> GstPadProbeReturn {
