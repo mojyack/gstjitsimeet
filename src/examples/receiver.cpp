@@ -55,6 +55,7 @@ auto jitsibin_pad_added_handler(GstElement* const jitsibin, GstPad* const pad, g
         const auto fakesink_sink_pad = AutoGstObject(gst_element_get_static_pad(&fakesink, "sink"));
         assert_n(fakesink_sink_pad.get() != NULL);
         assert_n(gst_pad_link(pad, fakesink_sink_pad.get()) == GST_PAD_LINK_OK);
+        assert_n(gst_element_sync_state_with_parent(&fakesink) == TRUE);
         return;
     }
 
@@ -72,6 +73,9 @@ auto jitsibin_pad_added_handler(GstElement* const jitsibin, GstPad* const pad, g
     assert_n(gst_pad_link(pad, GST_PAD(dec_sink_pad.get())) == GST_PAD_LINK_OK);
     assert_n(gst_element_link_pads(&dec, NULL, &videoconvert, NULL) == TRUE);
     assert_n(gst_element_link_pads(&videoconvert, NULL, &waylandsink, NULL) == TRUE);
+    assert_n(gst_element_sync_state_with_parent(&videoconvert) == TRUE);
+    assert_n(gst_element_sync_state_with_parent(&waylandsink) == TRUE);
+    assert_n(gst_element_sync_state_with_parent(&dec) == TRUE);
     PRINT("added h264 decoder");
 }
 
