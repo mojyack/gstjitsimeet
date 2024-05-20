@@ -1,12 +1,12 @@
 #include <gst/gst.h>
 #include <gst/video/gstvideodecoder.h>
 
-#include "../auto-gst-object.hpp"
+#include "../gstutil/auto-gst-object.hpp"
+#include "../gstutil/pipeline-helper.hpp"
 #include "../macros/autoptr.hpp"
 #include "../macros/unwrap.hpp"
 #include "../util/charconv.hpp"
 #include "../util/misc.hpp"
-#include "helper.hpp"
 
 namespace {
 declare_autoptr(GMainLoop, GMainLoop, g_main_loop_unref);

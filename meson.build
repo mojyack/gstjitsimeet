@@ -26,16 +26,16 @@ library('gstjitsimeet', src + libjitsimeet_src,
 
 # examples
 executable('receiver-example', 
-        files('src/examples/helper.cpp', 'src/examples/receiver.cpp'),
+        files('src/gstutil/pipeline-helper.cpp', 'src/examples/receiver.cpp'),
         dependencies: [gstreamer_dep]
 ) 
 executable('room-to-room-example', 
-        files('src/examples/helper.cpp', 'src/examples/room-to-room.cpp'),
+        files('src/gstutil/pipeline-helper.cpp', 'src/examples/room-to-room.cpp'),
         dependencies: [gstreamer_dep]
 ) 
 # TODO: move this example to another repository
 #       here is not a correct place for this, since this is unrelated to jitsi
 executable('dynamic-pipeline-switch-example', 
-        files('src/examples/helper.cpp', 'src/examples/dynamic-pipeline-switch.cpp'),
+        files('src/gstutil/pipeline-helper.cpp', 'src/examples/dynamic-pipeline-switch.cpp'),
         dependencies: [gstreamer_dep]
 ) 

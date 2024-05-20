@@ -5,7 +5,7 @@
 #include <gst/rtp/gstrtpdefs.h>
 #include <gst/rtp/gstrtphdrext.h>
 
-#include "auto-gst-object.hpp"
+#include "gstutil/auto-gst-object.hpp"
 #include "jitsi/array-util.hpp"
 #include "jitsi/colibri.hpp"
 #include "jitsi/conference.hpp"
