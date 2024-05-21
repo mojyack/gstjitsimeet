@@ -5,8 +5,7 @@
 #include "../gstutil/pipeline-helper.hpp"
 #include "../macros/autoptr.hpp"
 #include "../macros/unwrap.hpp"
-#include "../util/charconv.hpp"
-#include "../util/misc.hpp"
+#include "helper.hpp"
 
 namespace {
 declare_autoptr(GMainLoop, GMainLoop, g_main_loop_unref);
@@ -26,26 +25,20 @@ auto jitsibin_pad_added_handler(GstElement* const jitsibin, GstPad* const pad, g
     const auto name   = std::string_view(name_g.get());
     PRINT("pad added name=", name);
 
-    const auto elms = split(name, "_");
-    assert_n(elms.size() == 3, "malformed pad name");
-    const auto participant_id = elms[0];
-    const auto codec          = elms[1];
-    unwrap_on(ssrc, from_chars<uint32_t>(elms[2]));
-    (void)participant_id;
-    (void)ssrc;
+    unwrap_on(pad_name, parse_jitsibin_pad_name(name));
 
     auto decoder = std::string();
     // TODO: handle all codec type
-    if(codec == "OPUS") {
+    if(pad_name.codec == "OPUS") {
         decoder = "TODO";
-    } else if(codec == "H264") {
+    } else if(pad_name.codec == "H264") {
         decoder = "avdec_h264";
-    } else if(codec == "VP8") {
+    } else if(pad_name.codec == "VP8") {
         decoder = "TODO";
-    } else if(codec == "VP9") {
+    } else if(pad_name.codec == "VP9") {
         decoder = "TODO";
     } else {
-        PRINT("unsupported codec: ", codec);
+        PRINT("unsupported codec: ", pad_name.codec);
         decoder = "fakesink";
         return;
     }
