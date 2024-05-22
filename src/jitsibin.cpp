@@ -673,6 +673,10 @@ struct ConferenceCallbacks : public conference::ConferenceCallbacks {
     auto on_participant_left(const conference::Participant& participant) -> void override {
         on_participant_joined_left(participant, GST_JITSIBIN_GET_CLASS(jitsibin)->participant_left_signal, "left");
     }
+
+    auto on_source_mute_info(const std::string_view source_name, const bool muted) -> void override {
+        PRINT("SourceInfo: name=", source_name, " muted=", muted);
+    }
 };
 
 auto null_to_ready(RealSelf& self) -> bool {
