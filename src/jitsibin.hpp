@@ -26,6 +26,7 @@ struct GstJitsiBinClass {
     // signals
     guint participant_joined_signal;
     guint participant_left_signal;
+    guint mute_state_changed_signal;
 };
 
 GType gst_jitsibin_get_type(void);

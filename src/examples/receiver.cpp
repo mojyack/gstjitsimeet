@@ -18,7 +18,10 @@ struct Context {
     GstElement* videotestsrc;
 };
 
-auto jitsibin_pad_added_handler(GstElement* const jitsibin, GstPad* const pad, gpointer const data) -> void {
+auto jitsibin_pad_added_handler(
+    GstElement* const jitsibin,
+    GstPad* const     pad,
+    gpointer const    data) -> void {
     auto& self = *std::bit_cast<Context*>(data);
 
     const auto name_g = AutoGString(gst_object_get_name(GST_OBJECT(pad)));
@@ -72,18 +75,38 @@ auto jitsibin_pad_added_handler(GstElement* const jitsibin, GstPad* const pad, g
     PRINT("added h264 decoder");
 }
 
-auto jitsibin_pad_removed_handler(GstElement* const jitisbin, GstPad* const pad, gpointer const data) -> void {
+auto jitsibin_pad_removed_handler(
+    GstElement* const jitisbin,
+    GstPad* const     pad,
+    gpointer const    data) -> void {
     const auto name_g = AutoGString(gst_object_get_name(GST_OBJECT(pad)));
     const auto name   = std::string_view(name_g.get());
     PRINT("pad removed name=", name);
 }
 
-auto jitsibin_participant_joined_handler(GstElement* const jitisbin, const gchar* const participant_id, const gchar* const nick) -> void {
+auto jitsibin_participant_joined_handler(
+    GstElement* const  jitisbin,
+    const gchar* const participant_id,
+    const gchar* const nick,
+    gpointer const     data) -> void {
     PRINT("participant joined ", participant_id, " ", nick);
 }
 
-auto jitsibin_participant_left_handler(GstElement* const jitisbin, const gchar* const participant_id, const gchar* const nick) -> void {
+auto jitsibin_participant_left_handler(
+    GstElement* const  jitisbin,
+    const gchar* const participant_id,
+    const gchar* const nick,
+    gpointer const     data) -> void {
     PRINT("participant left ", participant_id, " ", nick);
+}
+
+auto jitsibin_mute_state_changed_handler(
+    GstElement* const  jitisbin,
+    const gchar* const participant_id,
+    const gboolean     is_audio,
+    const gboolean     new_muted,
+    gpointer const     data) -> void {
+    PRINT("mute state changed ", participant_id, " ", is_audio ? "audio" : "video", "=", new_muted);
 }
 
 auto run() -> bool {
@@ -112,6 +135,7 @@ auto run() -> bool {
     g_signal_connect(&jitsibin, "pad-removed", G_CALLBACK(jitsibin_pad_removed_handler), &context);
     g_signal_connect(&jitsibin, "participant-joined", G_CALLBACK(jitsibin_participant_joined_handler), &context);
     g_signal_connect(&jitsibin, "participant-left", G_CALLBACK(jitsibin_participant_left_handler), &context);
+    g_signal_connect(&jitsibin, "mute-state-changed", G_CALLBACK(jitsibin_mute_state_changed_handler), &context);
 
     g_object_set(&waylandsink,
                  "async", FALSE,

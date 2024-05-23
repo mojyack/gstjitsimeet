@@ -679,6 +679,11 @@ struct ConferenceCallbacks : public conference::ConferenceCallbacks {
         if(self.props.verbose) {
             print("mute state changed ", participant.participant_id, " ", is_audio ? "audio" : "video", "=", new_muted);
         }
+        const auto signal = GST_JITSIBIN_GET_CLASS(jitsibin)->mute_state_changed_signal;
+        g_signal_emit(jitsibin, signal, 0,
+                      participant.participant_id.data(),
+                      is_audio ? TRUE : FALSE,
+                      new_muted ? TRUE : FALSE);
     }
 };
 
@@ -820,8 +825,15 @@ auto gst_jitsibin_finalize(GObject* object) -> void {
 }
 
 auto gst_jitsibin_class_init(GstJitsiBinClass* klass) -> void {
-    klass->participant_joined_signal = g_signal_new("participant-joined", G_TYPE_FROM_CLASS(klass), G_SIGNAL_RUN_FIRST, 0, NULL, NULL, NULL, G_TYPE_NONE, 2, G_TYPE_STRING, G_TYPE_STRING);
-    klass->participant_left_signal   = g_signal_new("participant-left", G_TYPE_FROM_CLASS(klass), G_SIGNAL_RUN_FIRST, 0, NULL, NULL, NULL, G_TYPE_NONE, 2, G_TYPE_STRING, G_TYPE_STRING);
+    klass->participant_joined_signal = g_signal_new(
+        "participant-joined", G_TYPE_FROM_CLASS(klass), G_SIGNAL_RUN_FIRST, 0, NULL, NULL, NULL, G_TYPE_NONE,
+        2, G_TYPE_STRING, G_TYPE_STRING);
+    klass->participant_left_signal = g_signal_new(
+        "participant-left", G_TYPE_FROM_CLASS(klass), G_SIGNAL_RUN_FIRST, 0, NULL, NULL, NULL, G_TYPE_NONE,
+        2, G_TYPE_STRING, G_TYPE_STRING);
+    klass->mute_state_changed_signal = g_signal_new(
+        "mute-state-changed", G_TYPE_FROM_CLASS(klass), G_SIGNAL_RUN_FIRST, 0, NULL, NULL, NULL, G_TYPE_NONE,
+        3, G_TYPE_STRING, G_TYPE_BOOLEAN, G_TYPE_BOOLEAN);
 
     parent_class = g_type_class_peek_parent(klass);
 
