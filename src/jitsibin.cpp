@@ -674,8 +674,11 @@ struct ConferenceCallbacks : public conference::ConferenceCallbacks {
         on_participant_joined_left(participant, GST_JITSIBIN_GET_CLASS(jitsibin)->participant_left_signal, "left");
     }
 
-    auto on_source_mute_info(const std::string_view source_name, const bool muted) -> void override {
-        PRINT("SourceInfo: name=", source_name, " muted=", muted);
+    auto on_mute_state_changed(const conference::Participant& participant, const bool is_audio, const bool new_muted) -> void override {
+        auto& self = *jitsibin->real_self;
+        if(self.props.verbose) {
+            print("mute state changed ", participant.participant_id, " ", is_audio ? "audio" : "video", "=", new_muted);
+        }
     }
 };
 
