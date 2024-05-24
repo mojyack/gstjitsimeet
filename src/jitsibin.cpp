@@ -170,7 +170,8 @@ auto rtpbin_new_jitterbuffer_handler(GstElement* const rtpbin, GstElement* const
         source = &i->second;
     }
     if(source == nullptr) {
-        WARN("unknown ssrc");
+        WARN("unknown ssrc: ", ssrc);
+        WARN("ssrc-map size: ", jingle_session.ssrc_map.size());
         if(self.props.verbose) {
             for(auto i = jingle_session.ssrc_map.begin(); i != jingle_session.ssrc_map.end(); i = std::next(i)) {
                 WARN("known ssrc: ", i->second.ssrc, " ", i->second.participant_id);
@@ -310,7 +311,7 @@ auto rtpbin_pad_added_handler(GstElement* const rtpbin, GstPad* const pad, gpoin
     if(const auto i = jingle_session.ssrc_map.find(ssrc); i != jingle_session.ssrc_map.end()) {
         source = &i->second;
     }
-    assert_n(source != nullptr, "unknown ssrc");
+    assert_n(source != nullptr, "unknown ssrc: ", ssrc);
     if(self.props.verbose) {
         PRINT("pad added for remote source ", source->participant_id);
     }
