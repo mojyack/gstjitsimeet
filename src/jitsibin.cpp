@@ -310,7 +310,30 @@ auto rtpbin_pad_added_handler(GstElement* const rtpbin, GstPad* const pad, gpoin
     if(const auto i = jingle_session.ssrc_map.find(ssrc); i != jingle_session.ssrc_map.end()) {
         source = &i->second;
     }
-    assert_n(source != nullptr, "unknown ssrc: ", ssrc);
+
+    auto use_fakesink = false;
+    if(source == nullptr) {
+        // jicofo did not send source-add jingle?
+        // we cannot handle this pad since we do not know its format.
+        WARN("unknown ssrc: ", ssrc, "\ninstalling fakesink...");
+        use_fakesink = true;
+    } else if(self.props.last_n == 0) {
+        // why jvb send stream while last_n == 0?
+        // user probably do not handle this pad.
+        WARN("unwanted stream found. installing fakesink...");
+        use_fakesink = true;
+    }
+    if(use_fakesink) {
+        // add fakesink to prevent broken pipeline
+        const auto fakesink = AutoGstObject(gst_element_factory_make("fakesink", NULL));
+        assert_n(call_vfunc(self, add_element, fakesink.get()) == TRUE);
+        const auto fakesink_sink_pad = AutoGstObject(gst_element_get_static_pad(fakesink.get(), "sink"));
+        assert_n(fakesink_sink_pad.get() != NULL);
+        assert_n(gst_pad_link(pad, GST_PAD(fakesink_sink_pad.get())) == GST_PAD_LINK_OK);
+        assert_n(gst_element_sync_state_with_parent(fakesink.get()));
+        return;
+    }
+
     if(self.props.verbose) {
         PRINT("pad added for remote source ", source->participant_id);
     }
@@ -328,22 +351,6 @@ auto rtpbin_pad_added_handler(GstElement* const rtpbin, GstPad* const pad, gpoin
     const auto depay_sink_pad = AutoGstObject(gst_element_get_static_pad(depay.get(), "sink"));
     assert_n(depay_sink_pad.get() != NULL);
     assert_n(gst_pad_link(pad, GST_PAD(depay_sink_pad.get())) == GST_PAD_LINK_OK);
-
-    if(self.props.last_n == 0) {
-        // we should not reach here
-        // why jvb send stream while last_n == 0?
-        // user probably do not handle this pad, so add fakesink to prevent broken pipeline
-        const auto fakesink = AutoGstObject(gst_element_factory_make("fakesink", NULL));
-        assert_n(call_vfunc(self, add_element, fakesink.get()) == TRUE);
-        assert_n(gst_element_sync_state_with_parent(fakesink.get()));
-        const auto depay_src_pad = AutoGstObject(gst_element_get_static_pad(depay.get(), "src"));
-        assert_n(depay_src_pad.get() != NULL);
-        const auto fakesink_sink_pad = AutoGstObject(gst_element_get_static_pad(fakesink.get(), "sink"));
-        assert_n(fakesink_sink_pad.get() != NULL);
-        assert_n(gst_pad_link(GST_PAD(depay_src_pad.get()), GST_PAD(fakesink_sink_pad.get())) == GST_PAD_LINK_OK);
-
-        return;
-    }
 
     // expose src pad
     unwrap_pn(encoding_name, codec_type_to_rtp_encoding_name.find(codec.type));
