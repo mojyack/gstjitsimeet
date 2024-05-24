@@ -103,6 +103,9 @@ auto Props::handle_set_prop(const guint id, const GValue* const value, GParamSpe
     case async_sink_id:
         async_sink = g_value_get_boolean(value) == TRUE;
         return true;
+    case verbose_id:
+        verbose = g_value_get_boolean(value) == TRUE;
+        return true;
     case libws_loglevel_bitmap_id:
         config::libws_loglevel_bitmap = g_value_get_uint(value);
         return true;
@@ -176,6 +179,9 @@ auto Props::handle_get_prop(const guint id, GValue* const value, GParamSpec* con
         return true;
     case async_sink_id:
         g_value_set_boolean(value, async_sink ? TRUE : FALSE);
+        return true;
+    case verbose_id:
+        g_value_set_boolean(value, verbose ? TRUE : FALSE);
         return true;
     case libws_loglevel_bitmap_id:
         g_value_set_uint(value, config::libws_loglevel_bitmap);
