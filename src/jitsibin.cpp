@@ -171,7 +171,6 @@ auto rtpbin_new_jitterbuffer_handler(GstElement* const rtpbin, GstElement* const
     }
     if(source == nullptr) {
         WARN("unknown ssrc: ", ssrc);
-        WARN("ssrc-map size: ", jingle_session.ssrc_map.size());
         if(self.props.verbose) {
             for(auto i = jingle_session.ssrc_map.begin(); i != jingle_session.ssrc_map.end(); i = std::next(i)) {
                 WARN("known ssrc: ", i->second.ssrc, " ", i->second.participant_id);
