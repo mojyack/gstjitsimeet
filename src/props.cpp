@@ -1,4 +1,6 @@
 #include <array>
+#include <limits>
+
 #include <gst/gstutils.h>
 
 #include "jitsi/config.hpp"

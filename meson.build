@@ -1,5 +1,6 @@
 project('gstjitsimeet', 'cpp', version : '0.0', default_options : ['warning_level=3', 'cpp_std=c++20'])
-add_global_arguments('-Wfatal-errors', language: 'cpp')
+add_project_arguments('-Wfatal-errors', language: 'cpp')
+add_project_arguments('-fpermissive', language: 'cpp')
 
 gstreamer_dep = dependency('gstreamer-1.0', version : ['>=1.20'])
 
