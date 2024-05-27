@@ -21,7 +21,6 @@ subdir('src/jitsi')
 
 library('gstjitsimeet', src + libjitsimeet_src,
         dependencies: deps + libjitsimeet_deps,
-        link_args: ['-Wl,-z,stack-size=0x400000'], # TODO: really needed even in musl system?
         install : true,
 )
 
