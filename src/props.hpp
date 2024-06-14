@@ -34,7 +34,7 @@ struct Props {
     CodecType   audio_codec_type;
     CodecType   video_codec_type;
     int         last_n;
-    uint        jitterbuffer_latency;
+    guint       jitterbuffer_latency;
     bool        secure;
     bool        async_sink;
     bool        verbose;

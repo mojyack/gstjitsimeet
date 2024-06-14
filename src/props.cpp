@@ -272,7 +272,7 @@ auto Props::install_props(GObjectClass* const obj) -> void {
         g_param_spec_uint("jitterbuffer-latency",
                           NULL,
                           "Jitterbuffer latency in milliseconds",
-                          0, std::numeric_limits<uint>::max(), 200,
+                          0, std::numeric_limits<guint>::max(), 200,
                           rw_construct));
 
     g_object_class_install_property(
