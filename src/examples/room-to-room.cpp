@@ -23,7 +23,7 @@ struct Context {
     bool video_connected = false;
 };
 
-auto jitsibin_pad_added_handler(GstElement* const jitsibin, GstPad* const pad, gpointer const data) -> void {
+auto jitsibin_pad_added_handler(GstElement* const /*jitsibin*/, GstPad* const pad, gpointer const data) -> void {
     auto& self = *std::bit_cast<Context*>(data);
 
     const auto name_g = AutoGString(gst_object_get_name(GST_OBJECT(pad)));
@@ -111,18 +111,10 @@ auto jitsibin_pad_added_handler(GstElement* const jitsibin, GstPad* const pad, g
     }
 }
 
-auto jitsibin_pad_removed_handler(GstElement* const jitisbin, GstPad* const pad, gpointer const data) -> void {
+auto jitsibin_pad_removed_handler(GstElement* const /*jitisbin*/, GstPad* const pad, gpointer const /*data*/) -> void {
     const auto name_g = AutoGString(gst_object_get_name(GST_OBJECT(pad)));
     const auto name   = std::string_view(name_g.get());
     PRINT("pad removed name=", name);
-}
-
-auto jitsibin_participant_joined_handler(GstElement* const jitisbin, const gchar* const participant_id, const gchar* const nick) -> void {
-    PRINT("participant joined ", participant_id, " ", nick);
-}
-
-auto jitsibin_participant_left_handler(GstElement* const jitisbin, const gchar* const participant_id, const gchar* const nick) -> void {
-    PRINT("participant left ", participant_id, " ", nick);
 }
 
 auto run() -> bool {

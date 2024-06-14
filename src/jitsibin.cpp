@@ -91,7 +91,7 @@ auto get_prop(GObject* obj, const guint id, GValue* const value, GParamSpec* con
     self.props.handle_get_prop(id, value, spec);
 }
 
-auto rtpbin_request_pt_map_handler(GstElement* const rtpbin, const guint session, const guint pt, const gpointer data) -> GstCaps* {
+auto rtpbin_request_pt_map_handler(GstElement* const /*rtpbin*/, const guint session, const guint pt, const gpointer data) -> GstCaps* {
     auto& self = *std::bit_cast<RealSelf*>(data);
     if(self.props.verbose) {
         PRINT("rtpbin request-pt-map session=", session, " pt=", pt);
@@ -158,7 +158,7 @@ auto rtpbin_request_pt_map_handler(GstElement* const rtpbin, const guint session
     return NULL;
 }
 
-auto rtpbin_new_jitterbuffer_handler(GstElement* const rtpbin, GstElement* const jitterbuffer, const guint session, const guint ssrc, gpointer const data) -> void {
+auto rtpbin_new_jitterbuffer_handler(GstElement* const /*rtpbin*/, GstElement* const jitterbuffer, const guint session, const guint ssrc, gpointer const data) -> void {
     auto& self = *std::bit_cast<RealSelf*>(data);
     if(self.props.verbose) {
         PRINT("rtpbin new-jitterbuffer session=", session, " ssrc=", ssrc);
@@ -214,7 +214,7 @@ auto aux_handler_create_ghost_pad(GstElement* const target, const guint session,
     return AutoGstObject(pad);
 }
 
-auto rtpbin_request_aux_sender_handler(GstElement* const rtpbin, const guint session, gpointer const data) -> GstElement* {
+auto rtpbin_request_aux_sender_handler(GstElement* const /*rtpbin*/, const guint session, gpointer const data) -> GstElement* {
     auto& self = *std::bit_cast<RealSelf*>(data);
     if(self.props.verbose) {
         PRINT("rtpbin request-aux-sender session=", session);
@@ -245,7 +245,7 @@ auto rtpbin_request_aux_sender_handler(GstElement* const rtpbin, const guint ses
     return bin.release();
 }
 
-auto rtpbin_request_aux_receiver_handler(GstElement* const rtpbin, const guint session, gpointer const data) -> GstElement* {
+auto rtpbin_request_aux_receiver_handler(GstElement* const /*rtpbin*/, const guint session, gpointer const data) -> GstElement* {
     auto& self = *std::bit_cast<RealSelf*>(data);
     if(self.props.verbose) {
         PRINT("rtpbin request-aux-receiver session=", session);
@@ -272,7 +272,7 @@ auto rtpbin_request_aux_receiver_handler(GstElement* const rtpbin, const guint s
     return bin.release();
 }
 
-auto pay_depay_request_extension_handler(GstRTPBaseDepayload* depay, const guint ext_id, const gchar* ext_uri, gpointer const data) -> GstRTPHeaderExtension* {
+auto pay_depay_request_extension_handler(GstRTPBaseDepayload* const /*depay*/, const guint ext_id, const gchar* ext_uri, gpointer const data) -> GstRTPHeaderExtension* {
     auto& self = *std::bit_cast<RealSelf*>(data);
     if(self.props.verbose) {
         PRINT("(de)payloader extension request ext_id=", ext_id, " ext_uri=", ext_uri);
@@ -284,7 +284,7 @@ auto pay_depay_request_extension_handler(GstRTPBaseDepayload* depay, const guint
     return ext;
 }
 
-auto rtpbin_pad_added_handler(GstElement* const rtpbin, GstPad* const pad, gpointer const data) -> void {
+auto rtpbin_pad_added_handler(GstElement* const /*rtpbin*/, GstPad* const pad, gpointer const data) -> void {
     auto& self = *std::bit_cast<RealSelf*>(data);
     if(self.props.verbose) {
         PRINT("rtpbin pad_added");
@@ -514,7 +514,7 @@ auto construct_sub_pipeline(RealSelf& self) -> bool {
 
 auto replace_stub_sink_with_real_sink(RealSelf& self, RealSelf::SinkElements* elements = nullptr) -> bool;
 
-auto jitsibin_sink_block_callback(GstPad* const pad, GstPadProbeInfo* const info, gpointer const data) -> GstPadProbeReturn {
+auto jitsibin_sink_block_callback(GstPad* const pad, GstPadProbeInfo* const /*info*/, gpointer const data) -> GstPadProbeReturn {
     auto& self = *std::bit_cast<RealSelf*>(data);
     if(pad == self.audio_sink_elements.sink_pad) {
         replace_stub_sink_with_real_sink(self, &self.audio_sink_elements);
@@ -857,6 +857,4 @@ auto gst_jitsibin_class_init(GstJitsiBinClass* klass) -> void {
                                           "Filter/Network/RTP",
                                           "Jitsi Meet Bin",
                                           "mojyack <mojyack@gmail.com>");
-
-    const auto bin_class = (GstBinClass*)(klass);
 }
