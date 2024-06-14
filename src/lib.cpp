@@ -22,7 +22,7 @@ const auto plugin_desc = GstPluginDesc{
 } // namespace
 
 extern "C" {
-auto gst_plugin_jitsimeet_get_desc() -> const GstPluginDesc* {
+GST_PLUGIN_EXPORT auto gst_plugin_jitsimeet_get_desc() -> const GstPluginDesc* {
     return &plugin_desc;
 }
 }
