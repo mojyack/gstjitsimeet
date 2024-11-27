@@ -16,7 +16,6 @@ struct Props {
         jitterbuffer_latency_id,
         secure_id,
         async_sink_id,
-        verbose_id,
     };
 
     std::string server_address;
@@ -28,7 +27,6 @@ struct Props {
     guint       jitterbuffer_latency;
     bool        secure;
     bool        async_sink;
-    bool        verbose;
 
     auto ensure_required_prop() const -> bool;
     auto handle_set_prop(const guint id, const GValue* value, GParamSpec* spec) -> bool;

@@ -103,9 +103,6 @@ auto Props::handle_set_prop(const guint id, const GValue* const value, GParamSpe
     case async_sink_id:
         async_sink = g_value_get_boolean(value) == TRUE;
         return true;
-    case verbose_id:
-        verbose = g_value_get_boolean(value) == TRUE;
-        return true;
     default:
         return false;
     }
@@ -155,9 +152,6 @@ auto Props::handle_get_prop(const guint id, GValue* const value, GParamSpec* con
         return true;
     case async_sink_id:
         g_value_set_boolean(value, async_sink ? TRUE : FALSE);
-        return true;
-    case verbose_id:
-        g_value_set_boolean(value, verbose ? TRUE : FALSE);
         return true;
     default:
         return false;
@@ -235,7 +229,6 @@ auto Props::install_props(GObjectClass* const obj) -> void {
 
     bool_prop(secure_id, "insecure", "Trust server self-signed certification", FALSE);
     bool_prop(async_sink_id, "force-play", "Force pipeline to play even in conference with no participants", FALSE);
-    bool_prop(verbose_id, "verbose", "Enable debug messages", FALSE);
 
     gst_type_mark_as_plugin_api(audio_codec_type_get_type(), GstPluginAPIFlags(0));
     gst_type_mark_as_plugin_api(video_codec_type_get_type(), GstPluginAPIFlags(0));

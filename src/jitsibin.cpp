@@ -20,6 +20,7 @@
 #include "jitsi/conference.hpp"
 #include "jitsi/jingle-handler/jingle.hpp"
 #include "jitsi/util/charconv.hpp"
+#include "jitsi/util/logger.hpp"
 #include "jitsi/util/pair-table.hpp"
 #include "jitsi/util/span.hpp"
 #include "jitsi/util/split.hpp"
@@ -27,8 +28,10 @@
 #include "jitsi/xmpp/negotiator.hpp"
 #include "jitsibin.hpp"
 #include "macros/autoptr.hpp"
-#include "macros/unwrap.hpp"
 #include "props.hpp"
+
+#define CUTIL_MACROS_PRINT_FUNC logger.error
+#include "macros/unwrap.hpp"
 
 #define gst_jitsibin_parent_class parent_class
 G_DEFINE_TYPE(GstJitsiBin, gst_jitsibin, GST_TYPE_BIN);
@@ -59,6 +62,8 @@ struct RealSelf {
 };
 
 namespace {
+auto logger = Logger("jitsibin");
+
 #define call_vfunc(self, func, ...) \
     GST_BIN_GET_CLASS(self.bin)->func(self.bin, __VA_ARGS__)
 
@@ -100,9 +105,7 @@ auto get_prop(GObject* obj, const guint id, GValue* const value, GParamSpec* con
 
 auto rtpbin_request_pt_map_handler(GstElement* const /*rtpbin*/, const guint session, const guint pt, const gpointer data) -> GstCaps* {
     auto& self = *std::bit_cast<RealSelf*>(data);
-    if(self.props.verbose) {
-        line_print("rtpbin request-pt-map session=", session, " pt=", pt);
-    }
+    logger.debug("rtpbin request-pt-map session=", session, " pt=", pt);
     const auto& jingle_session = self.jingle_handler->get_session();
 
     const auto caps = gst_caps_new_simple("application/x-rtp",
@@ -161,15 +164,13 @@ auto rtpbin_request_pt_map_handler(GstElement* const /*rtpbin*/, const guint ses
         }
     }
     g_object_unref(caps);
-    line_warn("unknown payload type requested");
+    logger.warn("unknown payload type requested");
     return NULL;
 }
 
 auto rtpbin_new_jitterbuffer_handler(GstElement* const /*rtpbin*/, GstElement* const jitterbuffer, const guint session, const guint ssrc, gpointer const data) -> void {
     auto& self = *std::bit_cast<RealSelf*>(data);
-    if(self.props.verbose) {
-        line_print("rtpbin new-jitterbuffer session=", session, " ssrc=", ssrc);
-    }
+    logger.debug("rtpbin new-jitterbuffer session=", session, " ssrc=", ssrc);
     const auto& jingle_session = self.jingle_handler->get_session();
 
     auto source = (const Source*)(nullptr);
@@ -177,23 +178,17 @@ auto rtpbin_new_jitterbuffer_handler(GstElement* const /*rtpbin*/, GstElement* c
         source = &i->second;
     }
     if(source == nullptr) {
-        line_warn("unknown ssrc: ", ssrc);
-        if(self.props.verbose) {
-            for(auto i = jingle_session.ssrc_map.begin(); i != jingle_session.ssrc_map.end(); i = std::next(i)) {
-                line_warn("known ssrc: ", i->second.ssrc, " ", i->second.participant_id);
-            }
+        logger.warn("unknown ssrc: ", ssrc);
+        for(auto i = jingle_session.ssrc_map.begin(); i != jingle_session.ssrc_map.end(); i = std::next(i)) {
+            logger.debug("known ssrc: ", i->second.ssrc, " ", i->second.participant_id);
         }
         return;
     }
-    if(self.props.verbose) {
-        line_print("jitterbuffer is for remote source ", source->participant_id);
-    }
+    logger.debug("jitterbuffer is for remote source ", source->participant_id);
     if(source->type != SourceType::Video) {
         return;
     }
-    if(self.props.verbose) {
-        line_print("enabling RTX");
-    }
+    logger.debug("enabling RTX");
 
     g_object_set(jitterbuffer,
                  "do-retransmission", TRUE,
@@ -223,9 +218,7 @@ auto aux_handler_create_ghost_pad(GstElement* const target, const guint session,
 
 auto rtpbin_request_aux_sender_handler(GstElement* const /*rtpbin*/, const guint session, gpointer const data) -> GstElement* {
     auto& self = *std::bit_cast<RealSelf*>(data);
-    if(self.props.verbose) {
-        line_print("rtpbin request-aux-sender session=", session);
-    }
+    logger.debug("rtpbin request-aux-sender session=", session);
     const auto& jingle_session = self.jingle_handler->get_session();
 
     const auto pt_map   = aux_handler_create_pt_map(jingle_session.codecs);
@@ -254,9 +247,7 @@ auto rtpbin_request_aux_sender_handler(GstElement* const /*rtpbin*/, const guint
 
 auto rtpbin_request_aux_receiver_handler(GstElement* const /*rtpbin*/, const guint session, gpointer const data) -> GstElement* {
     auto& self = *std::bit_cast<RealSelf*>(data);
-    if(self.props.verbose) {
-        line_print("rtpbin request-aux-receiver session=", session);
-    }
+    logger.debug("rtpbin request-aux-receiver session=", session);
     const auto& jingle_session = self.jingle_handler->get_session();
 
     const auto pt_map = aux_handler_create_pt_map(jingle_session.codecs);
@@ -279,11 +270,8 @@ auto rtpbin_request_aux_receiver_handler(GstElement* const /*rtpbin*/, const gui
     return bin.release();
 }
 
-auto pay_depay_request_extension_handler(GstRTPBaseDepayload* const /*depay*/, const guint ext_id, const gchar* ext_uri, gpointer const data) -> GstRTPHeaderExtension* {
-    auto& self = *std::bit_cast<RealSelf*>(data);
-    if(self.props.verbose) {
-        line_print("(de)payloader extension request ext_id=", ext_id, " ext_uri=", ext_uri);
-    }
+auto pay_depay_request_extension_handler(GstRTPBaseDepayload* const /*depay*/, const guint ext_id, const gchar* ext_uri, gpointer const /*data*/) -> GstRTPHeaderExtension* {
+    logger.debug("(de)payloader extension request ext_id=", ext_id, " ext_uri=", ext_uri);
 
     auto ext = gst_rtp_header_extension_create_from_uri(ext_uri);
     ensure(ext != NULL);
@@ -293,16 +281,12 @@ auto pay_depay_request_extension_handler(GstRTPBaseDepayload* const /*depay*/, c
 
 auto rtpbin_pad_added_handler(GstElement* const /*rtpbin*/, GstPad* const pad, gpointer const data) -> void {
     auto& self = *std::bit_cast<RealSelf*>(data);
-    if(self.props.verbose) {
-        line_print("rtpbin pad_added");
-    }
+    logger.debug("rtpbin pad_added");
     const auto& jingle_session = self.jingle_handler->get_session();
 
     const auto name_g = AutoGString(gst_object_get_name(GST_OBJECT(pad)));
     const auto name   = std::string_view(name_g.get());
-    if(self.props.verbose) {
-        line_print("pad name=", name);
-    }
+    logger.debug("pad name=", name);
     if(!name.starts_with("recv_rtp_src_0_")) {
         return;
     }
@@ -322,12 +306,12 @@ auto rtpbin_pad_added_handler(GstElement* const /*rtpbin*/, GstPad* const pad, g
     if(source == nullptr) {
         // jicofo did not send source-add jingle?
         // we cannot handle this pad since we do not know its format.
-        line_warn("unknown ssrc: ", ssrc, "\ninstalling fakesink...");
+        logger.warn("unknown ssrc: ", ssrc, "\ninstalling fakesink...");
         use_fakesink = true;
     } else if(self.props.last_n == 0) {
         // why jvb send stream while last_n == 0?
         // user probably do not handle this pad.
-        line_warn("unwanted stream found. installing fakesink...");
+        logger.warn("unwanted stream found. installing fakesink...");
         use_fakesink = true;
     }
     if(use_fakesink) {
@@ -341,9 +325,7 @@ auto rtpbin_pad_added_handler(GstElement* const /*rtpbin*/, GstPad* const pad, g
         return;
     }
 
-    if(self.props.verbose) {
-        line_print("pad added for remote source ", source->participant_id);
-    }
+    logger.debug("pad added for remote source ", source->participant_id);
 
     // add depayloader
     unwrap(codec, jingle_session.find_codec_by_tx_pt(pt), "cannot find depayloader for such payload type");
@@ -451,8 +433,7 @@ auto construct_sub_pipeline(RealSelf& self) -> bool {
                      NULL);
         break;
     default:
-        line_warn("codec type bug");
-        break;
+        bail("codec type bug");
     }
     if(g_object_class_find_property(G_OBJECT_GET_CLASS(audio_pay), "auto-header-extension") != NULL) {
         g_object_set(audio_pay,
@@ -484,8 +465,7 @@ auto construct_sub_pipeline(RealSelf& self) -> bool {
                      NULL);
         break;
     default:
-        line_warn("codec type bug");
-        break;
+        bail("codec type bug");
     }
     if(g_object_class_find_property(G_OBJECT_GET_CLASS(video_pay), "auto-header-extension") != NULL) {
         g_object_set(video_pay,
@@ -589,11 +569,7 @@ struct ConferenceCallbacks : public conference::ConferenceCallbacks {
     JingleHandler*            jingle_handler;
 
     auto on_participant_joined_left(const conference::Participant& participant, const guint signal, const std::string_view debug_label) -> void {
-        auto& self = *jitsibin->real_self;
-        if(self.props.verbose) {
-            print("participant ", debug_label, " id=", participant.participant_id, " nick=", participant.nick);
-        }
-
+        logger.debug("participant ", debug_label, " id=", participant.participant_id, " nick=", participant.nick);
         g_signal_emit(jitsibin, signal, 0, participant.participant_id.data(), participant.nick.data());
     }
 
@@ -618,10 +594,7 @@ struct ConferenceCallbacks : public conference::ConferenceCallbacks {
     }
 
     auto on_mute_state_changed(const conference::Participant& participant, const bool is_audio, const bool new_muted) -> void override {
-        auto& self = *jitsibin->real_self;
-        if(self.props.verbose) {
-            print("mute state changed ", participant.participant_id, " ", is_audio ? "audio" : "video", "=", new_muted);
-        }
+        logger.debug("mute state changed ", participant.participant_id, " ", is_audio ? "audio" : "video", "=", new_muted);
         const auto signal = GST_JITSIBIN_GET_CLASS(jitsibin)->mute_state_changed_signal;
         g_signal_emit(jitsibin, signal, 0,
                       participant.participant_id.data(),
@@ -714,9 +687,7 @@ auto connect_to_conference(RealSelf& self, coop::AtomicEvent& pipeline_ready) ->
     }
 
     // create pipeline based on the jingle information
-    if(props.verbose) {
-        line_print("creating pipeline");
-    }
+    logger.debug("creating pipeline");
     co_ensure_v(construct_sub_pipeline(self));
 
     // expose real pipeline
