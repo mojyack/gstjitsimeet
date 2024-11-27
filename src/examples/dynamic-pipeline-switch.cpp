@@ -28,54 +28,54 @@ struct Context {
 
 auto switch_fake_to_wayland(Context& self) -> bool {
     // remove old elements
-    assert_b(gst_element_set_state(self.fakesink, GST_STATE_NULL) == GST_STATE_CHANGE_SUCCESS);
-    assert_b(gst_bin_remove(GST_BIN(self.pipeline), self.fakesink) == TRUE);
+    ensure(gst_element_set_state(self.fakesink, GST_STATE_NULL) == GST_STATE_CHANGE_SUCCESS);
+    ensure(gst_bin_remove(GST_BIN(self.pipeline), self.fakesink) == TRUE);
     self.fakesink = nullptr;
     // create new elements
-    unwrap_pb_mut(videoconvert, add_new_element_to_pipeine(self.pipeline, "videoconvert"));
-    unwrap_pb_mut(waylandsink, add_new_element_to_pipeine(self.pipeline, "waylandsink"));
+    unwrap_mut(videoconvert, add_new_element_to_pipeine(self.pipeline, "videoconvert"));
+    unwrap_mut(waylandsink, add_new_element_to_pipeine(self.pipeline, "waylandsink"));
     self.videoconvert = &videoconvert;
     self.waylandsink  = &waylandsink;
-    assert_b(gst_element_link_pads(self.videotestsrc, NULL, &videoconvert, NULL) == TRUE);
-    assert_b(gst_element_link_pads(&videoconvert, NULL, &waylandsink, NULL) == TRUE);
-    assert_b(gst_element_sync_state_with_parent(&waylandsink) == TRUE);
-    assert_b(gst_element_sync_state_with_parent(&videoconvert) == TRUE);
+    ensure(gst_element_link_pads(self.videotestsrc, NULL, &videoconvert, NULL) == TRUE);
+    ensure(gst_element_link_pads(&videoconvert, NULL, &waylandsink, NULL) == TRUE);
+    ensure(gst_element_sync_state_with_parent(&waylandsink) == TRUE);
+    ensure(gst_element_sync_state_with_parent(&videoconvert) == TRUE);
     return true;
 }
 
 auto switch_wayland_to_fake(Context& self) -> bool {
     // remove old elements
-    assert_b(gst_element_set_state(self.videoconvert, GST_STATE_NULL) == GST_STATE_CHANGE_SUCCESS);
-    assert_b(gst_bin_remove(GST_BIN(self.pipeline), self.videoconvert) == TRUE);
+    ensure(gst_element_set_state(self.videoconvert, GST_STATE_NULL) == GST_STATE_CHANGE_SUCCESS);
+    ensure(gst_bin_remove(GST_BIN(self.pipeline), self.videoconvert) == TRUE);
     self.videoconvert = nullptr;
-    assert_b(gst_element_set_state(self.waylandsink, GST_STATE_NULL) == GST_STATE_CHANGE_SUCCESS);
-    assert_b(gst_bin_remove(GST_BIN(self.pipeline), self.waylandsink) == TRUE);
+    ensure(gst_element_set_state(self.waylandsink, GST_STATE_NULL) == GST_STATE_CHANGE_SUCCESS);
+    ensure(gst_bin_remove(GST_BIN(self.pipeline), self.waylandsink) == TRUE);
     self.waylandsink = nullptr;
     // create new elements
-    unwrap_pb_mut(fakesink, add_new_element_to_pipeine(self.pipeline, "fakesink"));
+    unwrap_mut(fakesink, add_new_element_to_pipeine(self.pipeline, "fakesink"));
     self.fakesink = &fakesink;
-    assert_b(gst_element_link_pads(self.videotestsrc, NULL, &fakesink, NULL) == TRUE);
-    assert_b(gst_element_sync_state_with_parent(&fakesink) == TRUE);
+    ensure(gst_element_link_pads(self.videotestsrc, NULL, &fakesink, NULL) == TRUE);
+    ensure(gst_element_sync_state_with_parent(&fakesink) == TRUE);
     return true;
 }
 auto pad_block_callback(GstPad* const /*pad*/, GstPadProbeInfo* const /*info*/, gpointer const data) -> GstPadProbeReturn {
     auto& self = *std::bit_cast<Context*>(data);
-    PRINT("blocked");
+    line_print("blocked");
     if(self.fakesink != nullptr) {
         switch_fake_to_wayland(self);
     } else {
         switch_wayland_to_fake(self);
     }
-    PRINT("unblocking");
+    line_print("unblocking");
     return GST_PAD_PROBE_REMOVE;
 }
 
 auto run_dynamic_switch_example() -> bool {
     const auto pipeline = AutoGstObject(gst_pipeline_new(NULL));
-    assert_b(pipeline.get() != NULL);
+    ensure(pipeline.get() != NULL);
 
-    unwrap_pb_mut(videotestsrc, add_new_element_to_pipeine(pipeline.get(), "videotestsrc"));
-    unwrap_pb_mut(fakesink, add_new_element_to_pipeine(pipeline.get(), "fakesink"));
+    unwrap_mut(videotestsrc, add_new_element_to_pipeine(pipeline.get(), "videotestsrc"));
+    unwrap_mut(fakesink, add_new_element_to_pipeine(pipeline.get(), "fakesink"));
 
     g_object_set(&videotestsrc,
                  "is-live", TRUE,
@@ -94,17 +94,19 @@ auto run_dynamic_switch_example() -> bool {
     };
 
     auto switcher = std::thread([&videotestsrc, &context]() -> bool {
+        constexpr auto error_value = false;
+
         const auto src_pad = AutoGstObject(gst_element_get_static_pad(&videotestsrc, "src"));
-        assert_b(src_pad.get() != NULL);
+        ensure_v(src_pad.get() != NULL);
         while(true) {
             std::this_thread::sleep_for(std::chrono::seconds(1));
-            PRINT("switch");
+            line_print("switch");
             gst_pad_add_probe(src_pad.get(), GST_PAD_PROBE_TYPE_BLOCK_DOWNSTREAM, pad_block_callback, &context, NULL);
         }
         return true;
     });
 
-    assert_b(gst_element_link_pads(&videotestsrc, NULL, &fakesink, NULL) == TRUE);
+    ensure(gst_element_link_pads(&videotestsrc, NULL, &fakesink, NULL) == TRUE);
 
     auto ret = run_pipeline(pipeline.get());
     switcher.join();

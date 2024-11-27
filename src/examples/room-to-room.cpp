@@ -28,9 +28,9 @@ auto jitsibin_pad_added_handler(GstElement* const /*jitsibin*/, GstPad* const pa
 
     const auto name_g = AutoGString(gst_object_get_name(GST_OBJECT(pad)));
     const auto name   = std::string_view(name_g.get());
-    PRINT("pad added name=", name);
+    line_print("pad added name=", name);
 
-    unwrap_on(pad_name, parse_jitsibin_pad_name(name));
+    unwrap(pad_name, parse_jitsibin_pad_name(name));
 
     auto audio_decoder_name = (const char*)(nullptr);
     auto video_decoder_name = (const char*)(nullptr);
@@ -43,7 +43,7 @@ auto jitsibin_pad_added_handler(GstElement* const /*jitsibin*/, GstPad* const pa
     } else if(pad_name.codec == "VP9") {
         video_decoder_name = "avdec_vp9";
     } else {
-        PRINT("unsupported codec: ", pad_name.codec);
+        line_print("unsupported codec: ", pad_name.codec);
         return;
     }
 
@@ -69,44 +69,44 @@ auto jitsibin_pad_added_handler(GstElement* const /*jitsibin*/, GstPad* const pa
         //                                                              -> videoconvert -> x264enc -> jitsibin
         //
 
-        unwrap_pn_mut(dec, add_new_element_to_pipeine(self.pipeline, video_decoder_name));
-        unwrap_pn_mut(videoscale, add_new_element_to_pipeine(self.pipeline, "videoscale"));
-        unwrap_pn_mut(capsfilter, add_new_element_to_pipeine(self.pipeline, "capsfilter"));
+        unwrap_mut(dec, add_new_element_to_pipeine(self.pipeline, video_decoder_name));
+        unwrap_mut(videoscale, add_new_element_to_pipeine(self.pipeline, "videoscale"));
+        unwrap_mut(capsfilter, add_new_element_to_pipeine(self.pipeline, "capsfilter"));
         g_object_set(&capsfilter, "caps", caps.get(), NULL);
-        unwrap_pn_mut(tee, add_new_element_to_pipeine(self.pipeline, "tee"));
-        unwrap_pn_mut(videoconvert_wl, add_new_element_to_pipeine(self.pipeline, "videoconvert"));
-        unwrap_pn_mut(waylandsink, add_new_element_to_pipeine(self.pipeline, "waylandsink"));
-        unwrap_pn_mut(videoconvert_enc, add_new_element_to_pipeine(self.pipeline, "videoconvert"));
-        unwrap_pn_mut(enc, add_new_element_to_pipeine(self.pipeline, "x264enc"));
+        unwrap_mut(tee, add_new_element_to_pipeine(self.pipeline, "tee"));
+        unwrap_mut(videoconvert_wl, add_new_element_to_pipeine(self.pipeline, "videoconvert"));
+        unwrap_mut(waylandsink, add_new_element_to_pipeine(self.pipeline, "waylandsink"));
+        unwrap_mut(videoconvert_enc, add_new_element_to_pipeine(self.pipeline, "videoconvert"));
+        unwrap_mut(enc, add_new_element_to_pipeine(self.pipeline, "x264enc"));
         const auto dec_sink_pad = AutoGstObject(gst_element_get_static_pad(&dec, "sink"));
-        assert_n(gst_pad_link(pad, dec_sink_pad.get()) == GST_PAD_LINK_OK);
-        assert_n(gst_element_link_pads(&dec, NULL, &videoscale, NULL) == TRUE);
-        assert_n(gst_element_link_pads(&videoscale, NULL, &capsfilter, NULL) == TRUE);
-        assert_n(gst_element_link_pads(&capsfilter, NULL, &tee, NULL) == TRUE);
-        assert_n(gst_element_link_pads(&tee, NULL, &videoconvert_wl, NULL) == TRUE);
-        assert_n(gst_element_link_pads(&videoconvert_wl, NULL, &waylandsink, NULL) == TRUE);
-        assert_n(gst_element_link_pads(&tee, NULL, &videoconvert_enc, NULL) == TRUE);
-        assert_n(gst_element_link_pads(&videoconvert_enc, NULL, &enc, NULL) == TRUE);
-        assert_n(gst_element_link_pads(&enc, NULL, self.jitsibin_sink, "video_sink") == TRUE);
+        ensure(gst_pad_link(pad, dec_sink_pad.get()) == GST_PAD_LINK_OK);
+        ensure(gst_element_link_pads(&dec, NULL, &videoscale, NULL) == TRUE);
+        ensure(gst_element_link_pads(&videoscale, NULL, &capsfilter, NULL) == TRUE);
+        ensure(gst_element_link_pads(&capsfilter, NULL, &tee, NULL) == TRUE);
+        ensure(gst_element_link_pads(&tee, NULL, &videoconvert_wl, NULL) == TRUE);
+        ensure(gst_element_link_pads(&videoconvert_wl, NULL, &waylandsink, NULL) == TRUE);
+        ensure(gst_element_link_pads(&tee, NULL, &videoconvert_enc, NULL) == TRUE);
+        ensure(gst_element_link_pads(&videoconvert_enc, NULL, &enc, NULL) == TRUE);
+        ensure(gst_element_link_pads(&enc, NULL, self.jitsibin_sink, "video_sink") == TRUE);
 
-        assert_n(gst_element_sync_state_with_parent(&enc) == TRUE);
-        assert_n(gst_element_sync_state_with_parent(&videoconvert_enc) == TRUE);
-        assert_n(gst_element_sync_state_with_parent(&waylandsink) == TRUE);
-        assert_n(gst_element_sync_state_with_parent(&videoconvert_wl) == TRUE);
-        assert_n(gst_element_sync_state_with_parent(&tee) == TRUE);
-        assert_n(gst_element_sync_state_with_parent(&capsfilter) == TRUE);
-        assert_n(gst_element_sync_state_with_parent(&videoscale) == TRUE);
-        assert_n(gst_element_sync_state_with_parent(&dec) == TRUE);
+        ensure(gst_element_sync_state_with_parent(&enc) == TRUE);
+        ensure(gst_element_sync_state_with_parent(&videoconvert_enc) == TRUE);
+        ensure(gst_element_sync_state_with_parent(&waylandsink) == TRUE);
+        ensure(gst_element_sync_state_with_parent(&videoconvert_wl) == TRUE);
+        ensure(gst_element_sync_state_with_parent(&tee) == TRUE);
+        ensure(gst_element_sync_state_with_parent(&capsfilter) == TRUE);
+        ensure(gst_element_sync_state_with_parent(&videoscale) == TRUE);
+        ensure(gst_element_sync_state_with_parent(&dec) == TRUE);
 
         connected = true;
-        PRINT("video connected");
+        line_print("video connected");
         return;
     } else {
         const auto sink_pad = AutoGstObject(gst_element_get_static_pad(self.jitsibin_sink, "audio_sink"));
-        assert_n(sink_pad.get() != NULL);
-        assert_n(gst_pad_link(pad, sink_pad.get()) == GST_PAD_LINK_OK);
+        ensure(sink_pad.get() != NULL);
+        ensure(gst_pad_link(pad, sink_pad.get()) == GST_PAD_LINK_OK);
         connected = true;
-        PRINT("audio connected");
+        line_print("audio connected");
         return;
     }
 }
@@ -114,15 +114,15 @@ auto jitsibin_pad_added_handler(GstElement* const /*jitsibin*/, GstPad* const pa
 auto jitsibin_pad_removed_handler(GstElement* const /*jitisbin*/, GstPad* const pad, gpointer const /*data*/) -> void {
     const auto name_g = AutoGString(gst_object_get_name(GST_OBJECT(pad)));
     const auto name   = std::string_view(name_g.get());
-    PRINT("pad removed name=", name);
+    line_print("pad removed name=", name);
 }
 
 auto run() -> bool {
     const auto pipeline = AutoGstObject(gst_pipeline_new(NULL));
-    assert_b(pipeline.get() != NULL);
+    ensure(pipeline.get() != NULL);
 
-    unwrap_pb_mut(jitsibin_src, add_new_element_to_pipeine(pipeline.get(), "jitsibin"));
-    unwrap_pb_mut(jitsibin_sink, add_new_element_to_pipeine(pipeline.get(), "jitsibin"));
+    unwrap_mut(jitsibin_src, add_new_element_to_pipeine(pipeline.get(), "jitsibin"));
+    unwrap_mut(jitsibin_sink, add_new_element_to_pipeine(pipeline.get(), "jitsibin"));
 
     auto context = Context{
         .pipeline      = pipeline.get(),

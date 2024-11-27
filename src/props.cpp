@@ -6,7 +6,6 @@
 #include "jitsi/config.hpp"
 #include "macros/assert.hpp"
 #include "props.hpp"
-#include "util/assert.hpp"
 
 namespace {
 enum class AudioCodecType {
@@ -55,8 +54,8 @@ auto video_codec_type_get_type() -> GType {
 } // namespace
 
 auto Props::ensure_required_prop() const -> bool {
-    assert_b(!server_address.empty(), "please set server");
-    assert_b(!room_name.empty(), "please set room");
+    ensure(!server_address.empty(), "please set server");
+    ensure(!room_name.empty(), "please set room");
     return true;
 }
 
