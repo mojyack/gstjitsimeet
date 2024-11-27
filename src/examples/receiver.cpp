@@ -5,6 +5,7 @@
 #include "../gstutil/pipeline-helper.hpp"
 #include "../macros/autoptr.hpp"
 #include "../macros/unwrap.hpp"
+#include "../util/argument-parser.hpp"
 #include "helper.hpp"
 
 namespace {
@@ -89,8 +90,25 @@ auto jitsibin_participant_left_handler(GstElement* const /*jitisbin*/, const gch
 auto jitsibin_mute_state_changed_handler(GstElement* const /*jitisbin*/, const gchar* const participant_id, const gboolean is_audio, const gboolean new_muted, gpointer const /*data*/) -> void {
     line_print("mute state changed ", participant_id, " ", is_audio ? "audio" : "video", "=", new_muted);
 }
+} // namespace
 
-auto run() -> bool {
+auto main(const int argc, const char* const* argv) -> int {
+    const char* host = nullptr;
+    const char* room = nullptr;
+    {
+        auto help   = false;
+        auto parser = args::Parser<>();
+        parser.arg(&host, "HOST", "server domain");
+        parser.arg(&room, "ROOM", "room name");
+        parser.kwflag(&help, {"-h", "--help"}, "print this help message", {.no_error_check = true});
+        if(!parser.parse(argc, argv) || help) {
+            print("usage: example ", parser.get_help());
+            return 0;
+        }
+    }
+
+    gst_init(NULL, NULL);
+
     const auto pipeline = AutoGstObject(gst_pipeline_new(NULL));
     ensure(pipeline.get() != NULL);
 
@@ -133,13 +151,12 @@ auto run() -> bool {
                  "tune", 0x04,
                  NULL);
     g_object_set(&jitsibin,
-                 "server", "jitsi.local",
-                 "room", "sink",
+                 "server", host,
+                 "room", room,
                  "nick", "gstjitsimeet-example",
                  "receive-limit", 3,
                  "force-play", TRUE,
                  "insecure", TRUE,
-                 "dump-websocket-packets", TRUE,
                  NULL);
 
     ensure(gst_element_link_pads(&videotestsrc, NULL, &tee, NULL) == TRUE);
@@ -150,11 +167,7 @@ auto run() -> bool {
     ensure(gst_element_link_pads(&audiotestsrc, NULL, &opusenc, NULL) == TRUE);
     ensure(gst_element_link_pads(&opusenc, NULL, &jitsibin, "audio_sink") == TRUE);
 
-    return run_pipeline(pipeline.get());
-}
-} // namespace
+    ensure(run_pipeline(pipeline.get()));
 
-auto main(int argc, char* argv[]) -> int {
-    gst_init(&argc, &argv);
-    return run() ? 1 : 0;
+    return 0;
 }
