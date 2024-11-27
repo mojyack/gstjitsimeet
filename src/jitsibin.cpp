@@ -15,12 +15,12 @@
 #include <gst/rtp/gstrtphdrext.h>
 
 #include "gstutil/auto-gst-object.hpp"
-#include "jitsi/array-util.hpp"
 #include "jitsi/async-websocket.hpp"
 #include "jitsi/colibri.hpp"
 #include "jitsi/conference.hpp"
 #include "jitsi/jingle-handler/jingle.hpp"
 #include "jitsi/util/charconv.hpp"
+#include "jitsi/util/pair-table.hpp"
 #include "jitsi/util/span.hpp"
 #include "jitsi/util/split.hpp"
 #include "jitsi/xmpp/elements.hpp"
@@ -65,21 +65,21 @@ namespace {
 declare_autoptr(GstStructure, GstStructure, gst_structure_free);
 declare_autoptr(GString, gchar, g_free);
 
-const auto codec_type_to_payloader_name = make_str_table<CodecType>({
+const auto codec_type_to_payloader_name = make_pair_table<CodecType, std::string_view>({
     {CodecType::Opus, "rtpopuspay"},
     {CodecType::H264, "rtph264pay"},
     {CodecType::Vp8, "rtpvp8pay"},
     {CodecType::Vp9, "rtpvp9pay"},
 });
 
-const auto codec_type_to_depayloader_name = make_str_table<CodecType>({
+const auto codec_type_to_depayloader_name = make_pair_table<CodecType, std::string_view>({
     {CodecType::Opus, "rtpopusdepay"},
     {CodecType::H264, "rtph264depay"},
     {CodecType::Vp8, "rtpvp8depay"},
     {CodecType::Vp9, "rtpvp9depay"},
 });
 
-const auto codec_type_to_rtp_encoding_name = make_str_table<CodecType>({
+const auto codec_type_to_rtp_encoding_name = make_pair_table<CodecType, std::string_view>({
     {CodecType::Opus, "OPUS"},
     {CodecType::H264, "H264"},
     {CodecType::Vp8, "VP8"},
@@ -115,7 +115,7 @@ auto rtpbin_request_pt_map_handler(GstElement* const /*rtpbin*/, const guint ses
             case CodecType::Opus: {
                 gst_caps_set_simple(caps,
                                     "media", G_TYPE_STRING, "audio",
-                                    "encoding-name", G_TYPE_STRING, encoding_name.second,
+                                    "encoding-name", G_TYPE_STRING, encoding_name.data(),
                                     "clock-rate", G_TYPE_INT, 48000,
                                     NULL);
                 if(const auto ext = jingle_session.audio_hdrext_transport_cc; ext != -1) {
@@ -137,7 +137,7 @@ auto rtpbin_request_pt_map_handler(GstElement* const /*rtpbin*/, const guint ses
             case CodecType::Vp9: {
                 gst_caps_set_simple(caps,
                                     "media", G_TYPE_STRING, "video",
-                                    "encoding-name", G_TYPE_STRING, encoding_name.second,
+                                    "encoding-name", G_TYPE_STRING, encoding_name.data(),
                                     "clock-rate", G_TYPE_INT, 90000,
                                     "rtcp-fb-nack-pli", G_TYPE_BOOLEAN, TRUE,
                                     NULL);
@@ -348,7 +348,7 @@ auto rtpbin_pad_added_handler(GstElement* const /*rtpbin*/, GstPad* const pad, g
     // add depayloader
     unwrap(codec, jingle_session.find_codec_by_tx_pt(pt), "cannot find depayloader for such payload type");
     unwrap(depayloader_name, codec_type_to_depayloader_name.find(codec.type));
-    const auto depay = AutoGstObject(gst_element_factory_make(depayloader_name.second, NULL));
+    const auto depay = AutoGstObject(gst_element_factory_make(depayloader_name.data(), NULL));
     g_object_set(depay.get(),
                  "auto-header-extension", FALSE,
                  NULL);
@@ -361,7 +361,7 @@ auto rtpbin_pad_added_handler(GstElement* const /*rtpbin*/, GstPad* const pad, g
 
     // expose src pad
     unwrap(encoding_name, codec_type_to_rtp_encoding_name.find(codec.type));
-    const auto ghost_pad_name = build_string(source->participant_id, "_", encoding_name.second, "_", ssrc);
+    const auto ghost_pad_name = build_string(source->participant_id, "_", encoding_name.data(), "_", ssrc);
 
     const auto depay_src_pad = AutoGstObject(gst_element_get_static_pad(depay.get(), "src"));
     ensure(depay_src_pad.get() != NULL);
@@ -438,7 +438,7 @@ auto construct_sub_pipeline(RealSelf& self) -> bool {
     // audio payloader
     unwrap(audio_codec, jingle_session.find_codec_by_type(self.props.audio_codec_type));
     unwrap(audio_pay_name, codec_type_to_payloader_name.find(self.props.audio_codec_type));
-    const auto audio_pay = gst_element_factory_make(audio_pay_name.second, NULL);
+    const auto audio_pay = gst_element_factory_make(audio_pay_name.data(), NULL);
     ensure(audio_pay != NULL, "failed to create audio payloader");
     g_object_set(audio_pay,
                  "pt", audio_codec.tx_pt,
@@ -465,7 +465,7 @@ auto construct_sub_pipeline(RealSelf& self) -> bool {
     // video payloader
     unwrap(video_codec, jingle_session.find_codec_by_type(self.props.video_codec_type));
     unwrap(video_pay_name, codec_type_to_payloader_name.find(self.props.video_codec_type));
-    const auto video_pay = gst_element_factory_make(video_pay_name.second, NULL);
+    const auto video_pay = gst_element_factory_make(video_pay_name.data(), NULL);
     ensure(video_pay != NULL, "failed to create video payloader");
     g_object_set(video_pay,
                  "pt", video_codec.tx_pt,
@@ -657,9 +657,14 @@ auto connect_to_conference(RealSelf& self, coop::AtomicEvent& pipeline_ready) ->
         const auto negotiator = xmpp::Negotiator::create(props.server_address, &callbacks);
 
         ws_context.handler = [&negotiator, &event](const std::span<const std::byte> data) -> coop::Async<void> {
-            const auto done = negotiator->feed_payload(from_span(data));
-            if(done) {
+            switch(negotiator->feed_payload(from_span(data))) {
+            case xmpp::FeedResult::Continue:
+                break;
+            case xmpp::FeedResult::Error:
+                line_panic();
+            case xmpp::FeedResult::Done:
                 event.notify();
+                break;
             }
             co_return;
         };

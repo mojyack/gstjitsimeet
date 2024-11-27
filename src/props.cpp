@@ -3,7 +3,6 @@
 
 #include <gst/gstutils.h>
 
-#include "jitsi/config.hpp"
 #include "macros/assert.hpp"
 #include "props.hpp"
 
@@ -107,30 +106,6 @@ auto Props::handle_set_prop(const guint id, const GValue* const value, GParamSpe
     case verbose_id:
         verbose = g_value_get_boolean(value) == TRUE;
         return true;
-    case libws_loglevel_bitmap_id:
-        config::libws_loglevel_bitmap = g_value_get_uint(value);
-        return true;
-    case dump_websocket_packets_id:
-        config::dump_websocket_packets = g_value_get_boolean(value) == TRUE;
-        return true;
-    case debug_websocket_id:
-        config::debug_websocket = g_value_get_boolean(value) == TRUE;
-        return true;
-    case debug_xmpp_connection_id:
-        config::debug_xmpp_connection = g_value_get_boolean(value) == TRUE;
-        return true;
-    case debug_conference_id:
-        config::debug_conference = g_value_get_boolean(value) == TRUE;
-        return true;
-    case debug_jingle_handler_id:
-        config::debug_jingle_handler = g_value_get_boolean(value) == TRUE;
-        return true;
-    case debug_ice_id:
-        config::debug_ice = g_value_get_boolean(value) == TRUE;
-        return true;
-    case debug_colibri_id:
-        config::debug_colibri = g_value_get_boolean(value) == TRUE;
-        return true;
     default:
         return false;
     }
@@ -183,30 +158,6 @@ auto Props::handle_get_prop(const guint id, GValue* const value, GParamSpec* con
         return true;
     case verbose_id:
         g_value_set_boolean(value, verbose ? TRUE : FALSE);
-        return true;
-    case libws_loglevel_bitmap_id:
-        g_value_set_uint(value, config::libws_loglevel_bitmap);
-        return true;
-    case dump_websocket_packets_id:
-        g_value_set_boolean(value, config::dump_websocket_packets ? TRUE : FALSE);
-        return true;
-    case debug_websocket_id:
-        g_value_set_boolean(value, config::debug_websocket ? TRUE : FALSE);
-        return true;
-    case debug_xmpp_connection_id:
-        g_value_set_boolean(value, config::debug_xmpp_connection ? TRUE : FALSE);
-        return true;
-    case debug_conference_id:
-        g_value_set_boolean(value, config::debug_conference ? TRUE : FALSE);
-        return true;
-    case debug_jingle_handler_id:
-        g_value_set_boolean(value, config::debug_jingle_handler ? TRUE : FALSE);
-        return true;
-    case debug_ice_id:
-        g_value_set_boolean(value, config::debug_ice ? TRUE : FALSE);
-        return true;
-    case debug_colibri_id:
-        g_value_set_boolean(value, config::debug_colibri ? TRUE : FALSE);
         return true;
     default:
         return false;
@@ -285,22 +236,6 @@ auto Props::install_props(GObjectClass* const obj) -> void {
     bool_prop(secure_id, "insecure", "Trust server self-signed certification", FALSE);
     bool_prop(async_sink_id, "force-play", "Force pipeline to play even in conference with no participants", FALSE);
     bool_prop(verbose_id, "verbose", "Enable debug messages", FALSE);
-
-    g_object_class_install_property(
-        obj, libws_loglevel_bitmap_id,
-        g_param_spec_uint("lws-loglevel-bitmap",
-                          NULL,
-                          "libwebsockets lws_set_log_level value",
-                          0, std::numeric_limits<int>::max(), 0b11, // LLL_ERR | LLL_WARN
-                          rw_construct));
-
-    bool_prop(dump_websocket_packets_id, "dump-websocket-packets", "Print websocket packets", FALSE);
-    bool_prop(debug_websocket_id, "debug-websocket", "Enable websocket debug messages", FALSE);
-    bool_prop(debug_xmpp_connection_id, "debug-xmpp-negotiation", "Enable xmpp negotiator debug messages", FALSE);
-    bool_prop(debug_conference_id, "debug-conference", "Enable conference debug messages", FALSE);
-    bool_prop(debug_jingle_handler_id, "debug-jingle", "Enable jingle debug messages", FALSE);
-    bool_prop(debug_ice_id, "debug-ice", "Enable ice debug messages", FALSE);
-    bool_prop(debug_colibri_id, "debug-colibri", "Enable colibri debug messages", FALSE);
 
     gst_type_mark_as_plugin_api(audio_codec_type_get_type(), GstPluginAPIFlags(0));
     gst_type_mark_as_plugin_api(video_codec_type_get_type(), GstPluginAPIFlags(0));
