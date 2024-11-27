@@ -36,9 +36,3 @@ executable('room-to-room-example',
         files('src/gstutil/pipeline-helper.cpp', 'src/examples/room-to-room.cpp'),
         dependencies: [gstreamer_dep]
 ) 
-# TODO: move this example to another repository
-#       here is not a correct place for this, since this is unrelated to jitsi
-executable('dynamic-pipeline-switch-example', 
-        files('src/gstutil/pipeline-helper.cpp', 'src/examples/dynamic-pipeline-switch.cpp'),
-        dependencies: [gstreamer_dep]
-) 
