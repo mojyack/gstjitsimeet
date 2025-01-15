@@ -28,7 +28,7 @@ auto jitsibin_pad_added_handler(GstElement* const /*jitsibin*/, GstPad* const pa
 
     const auto name_g = AutoGString(gst_object_get_name(GST_OBJECT(pad)));
     const auto name   = std::string_view(name_g.get());
-    line_print("pad added name=", name);
+    PRINT("pad added name=", name);
 
     unwrap(pad_name, parse_jitsibin_pad_name(name));
 
@@ -43,7 +43,7 @@ auto jitsibin_pad_added_handler(GstElement* const /*jitsibin*/, GstPad* const pa
     } else if(pad_name.codec == "VP9") {
         video_decoder_name = "avdec_vp9";
     } else {
-        line_print("unsupported codec: ", pad_name.codec);
+        PRINT("unsupported codec: ", pad_name.codec);
         return;
     }
 
@@ -99,14 +99,14 @@ auto jitsibin_pad_added_handler(GstElement* const /*jitsibin*/, GstPad* const pa
         ensure(gst_element_sync_state_with_parent(&dec) == TRUE);
 
         connected = true;
-        line_print("video connected");
+        PRINT("video connected");
         return;
     } else {
         const auto sink_pad = AutoGstObject(gst_element_get_static_pad(self.jitsibin_sink, "audio_sink"));
         ensure(sink_pad.get() != NULL);
         ensure(gst_pad_link(pad, sink_pad.get()) == GST_PAD_LINK_OK);
         connected = true;
-        line_print("audio connected");
+        PRINT("audio connected");
         return;
     }
 }
@@ -114,7 +114,7 @@ auto jitsibin_pad_added_handler(GstElement* const /*jitsibin*/, GstPad* const pa
 auto jitsibin_pad_removed_handler(GstElement* const /*jitisbin*/, GstPad* const pad, gpointer const /*data*/) -> void {
     const auto name_g = AutoGString(gst_object_get_name(GST_OBJECT(pad)));
     const auto name   = std::string_view(name_g.get());
-    line_print("pad removed name=", name);
+    PRINT("pad removed name=", name);
 }
 
 auto run() -> bool {
