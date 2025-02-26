@@ -396,6 +396,8 @@ auto construct_sub_pipeline(RealSelf& self) -> bool {
                  "agent", jingle_session.ice_agent.agent.get(),
                  "stream", jingle_session.ice_agent.stream_id,
                  "component", jingle_session.ice_agent.component_id,
+                 "sync", FALSE,
+                 "async", FALSE,
                  NULL);
     ensure(call_vfunc(self, add_element, nicesink) == TRUE);
 
