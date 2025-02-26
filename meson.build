@@ -23,6 +23,7 @@ library('gstjitsimeet', files(
   ) + libjitsimeet_src,
   dependencies : deps + libjitsimeet_deps,
   install : true,
+  install_dir : get_option('libdir') / 'gstreamer-1.0',
 )
 
 # examples
