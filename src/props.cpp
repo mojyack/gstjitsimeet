@@ -3,8 +3,9 @@
 
 #include <gst/gstutils.h>
 
-#include "macros/assert.hpp"
+#include "macros/unwrap.hpp"
 #include "props.hpp"
+#include "util/pair-table.hpp"
 
 namespace {
 enum class AudioCodecType {
@@ -17,6 +18,16 @@ enum class VideoCodecType {
     Vp9,
 };
 
+auto audio_codec_type_table = make_pair_table<CodecType, AudioCodecType>({
+    {CodecType::Opus, AudioCodecType::Opus},
+});
+
+auto video_codec_type_table = make_pair_table<CodecType, VideoCodecType>({
+    {CodecType::H264, VideoCodecType::H264},
+    {CodecType::Vp8, VideoCodecType::Vp8},
+    {CodecType::Vp9, VideoCodecType::Vp9},
+});
+
 auto audio_codec_type_get_type() -> GType {
     static auto type = GType(0);
     if(type != 0) {
@@ -24,7 +35,7 @@ auto audio_codec_type_get_type() -> GType {
     }
 
     static const auto value = std::array{
-        GEnumValue{static_cast<guint>(AudioCodecType::Opus), "opus", "Opus"},
+        GEnumValue{std::to_underlying(AudioCodecType::Opus), "opus", "Opus"},
         GEnumValue{0, NULL, NULL},
     };
 
@@ -40,9 +51,9 @@ auto video_codec_type_get_type() -> GType {
     }
 
     static const auto value = std::array{
-        GEnumValue{static_cast<guint>(VideoCodecType::H264), "h264", "H.264"},
-        GEnumValue{static_cast<guint>(VideoCodecType::Vp8), "vp8", "VP8"},
-        GEnumValue{static_cast<guint>(VideoCodecType::Vp9), "vp9", "VP9"},
+        GEnumValue{std::to_underlying(VideoCodecType::H264), "h264", "H.264"},
+        GEnumValue{std::to_underlying(VideoCodecType::Vp8), "vp8", "VP8"},
+        GEnumValue{std::to_underlying(VideoCodecType::Vp9), "vp9", "VP9"},
         GEnumValue{0, NULL, NULL},
     };
 
@@ -69,28 +80,16 @@ auto Props::handle_set_prop(const guint id, const GValue* const value, GParamSpe
     case nick_id:
         nick = g_value_get_string(value);
         return true;
-    case audio_codec_type_id:
-        switch(AudioCodecType(g_value_get_enum(value))) {
-        case AudioCodecType::Opus:
-            audio_codec_type = CodecType::Opus;
-            return true;
-        default:
-            return false;
-        }
-    case video_codec_type_id:
-        switch(VideoCodecType(g_value_get_enum(value))) {
-        case VideoCodecType::H264:
-            video_codec_type = CodecType::H264;
-            return true;
-        case VideoCodecType::Vp8:
-            video_codec_type = CodecType::Vp8;
-            return true;
-        case VideoCodecType::Vp9:
-            video_codec_type = CodecType::Vp9;
-            return true;
-        default:
-            return false;
-        }
+    case audio_codec_type_id: {
+        unwrap(type, audio_codec_type_table.find(AudioCodecType(g_value_get_enum(value))));
+        audio_codec_type = type;
+        return true;
+    }
+    case video_codec_type_id: {
+        unwrap(type, video_codec_type_table.find(VideoCodecType(g_value_get_enum(value))));
+        video_codec_type = type;
+        return true;
+    }
     case last_n_id:
         last_n = g_value_get_int(value);
         return true;
@@ -119,28 +118,16 @@ auto Props::handle_get_prop(const guint id, GValue* const value, GParamSpec* con
     case nick_id:
         g_value_set_string(value, nick.data());
         return true;
-    case audio_codec_type_id:
-        switch(audio_codec_type) {
-        case CodecType::Opus:
-            g_value_set_enum(value, gint(AudioCodecType::Opus));
-            return true;
-        default:
-            return false;
-        }
-    case video_codec_type_id:
-        switch(video_codec_type) {
-        case CodecType::H264:
-            g_value_set_enum(value, gint(CodecType::H264));
-            return true;
-        case CodecType::Vp8:
-            g_value_set_enum(value, gint(CodecType::Vp8));
-            return true;
-        case CodecType::Vp9:
-            g_value_set_enum(value, gint(CodecType::Vp9));
-            return true;
-        default:
-            return false;
-        }
+    case audio_codec_type_id: {
+        unwrap(type, audio_codec_type_table.find(audio_codec_type));
+        g_value_set_enum(value, std::to_underlying(type));
+        return true;
+    }
+    case video_codec_type_id: {
+        unwrap(type, video_codec_type_table.find(video_codec_type));
+        g_value_set_enum(value, std::to_underlying(type));
+        return true;
+    }
     case last_n_id:
         g_value_set_int(value, last_n);
         return true;

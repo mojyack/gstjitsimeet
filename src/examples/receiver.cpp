@@ -24,7 +24,7 @@ auto jitsibin_pad_added_handler(GstElement* const /*jitsibin*/, GstPad* const pa
 
     const auto name_g = AutoGString(gst_object_get_name(GST_OBJECT(pad)));
     const auto name   = std::string_view(name_g.get());
-    PRINT("pad added name=", name);
+    PRINT("pad added name={}", name);
 
     unwrap(pad_name, parse_jitsibin_pad_name(name));
 
@@ -39,7 +39,7 @@ auto jitsibin_pad_added_handler(GstElement* const /*jitsibin*/, GstPad* const pa
     } else if(pad_name.codec == "VP9") {
         decoder = "TODO";
     } else {
-        PRINT("unsupported codec: ", pad_name.codec);
+        PRINT("unsupported codec {}", pad_name.codec);
         decoder = "fakesink";
         return;
     }
@@ -76,19 +76,19 @@ auto jitsibin_pad_added_handler(GstElement* const /*jitsibin*/, GstPad* const pa
 auto jitsibin_pad_removed_handler(GstElement* const /*jitisbin*/, GstPad* const pad, gpointer const /*data*/) -> void {
     const auto name_g = AutoGString(gst_object_get_name(GST_OBJECT(pad)));
     const auto name   = std::string_view(name_g.get());
-    PRINT("pad removed name=", name);
+    PRINT("pad removed name={}", name);
 }
 
 auto jitsibin_participant_joined_handler(GstElement* const /*jitisbin*/, const gchar* const participant_id, const gchar* const nick, gpointer const /*data*/) -> void {
-    PRINT("participant joined ", participant_id, " ", nick);
+    PRINT("participant joined id={} nick={}", participant_id, nick);
 }
 
 auto jitsibin_participant_left_handler(GstElement* const /*jitisbin*/, const gchar* const participant_id, const gchar* const nick, gpointer const /*data*/) -> void {
-    PRINT("participant left ", participant_id, " ", nick);
+    PRINT("participant left id={} nick={}", participant_id, nick);
 }
 
 auto jitsibin_mute_state_changed_handler(GstElement* const /*jitisbin*/, const gchar* const participant_id, const gboolean is_audio, const gboolean new_muted, gpointer const /*data*/) -> void {
-    PRINT("mute state changed ", participant_id, " ", is_audio ? "audio" : "video", "=", new_muted);
+    PRINT("mute state changed id={} {}={}", participant_id, is_audio ? "audio" : "video", new_muted);
 }
 } // namespace
 
@@ -102,7 +102,7 @@ auto main(const int argc, const char* const* argv) -> int {
         parser.arg(&room, "ROOM", "room name");
         parser.kwflag(&help, {"-h", "--help"}, "print this help message", {.no_error_check = true});
         if(!parser.parse(argc, argv) || help) {
-            print("usage: example ", parser.get_help());
+            std::println("usage: example {}", parser.get_help());
             return 0;
         }
     }

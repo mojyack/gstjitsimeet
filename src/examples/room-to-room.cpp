@@ -28,7 +28,7 @@ auto jitsibin_pad_added_handler(GstElement* const /*jitsibin*/, GstPad* const pa
 
     const auto name_g = AutoGString(gst_object_get_name(GST_OBJECT(pad)));
     const auto name   = std::string_view(name_g.get());
-    PRINT("pad added name=", name);
+    PRINT("pad added name={}", name);
 
     unwrap(pad_name, parse_jitsibin_pad_name(name));
 
@@ -43,7 +43,7 @@ auto jitsibin_pad_added_handler(GstElement* const /*jitsibin*/, GstPad* const pa
     } else if(pad_name.codec == "VP9") {
         video_decoder_name = "avdec_vp9";
     } else {
-        PRINT("unsupported codec: ", pad_name.codec);
+        PRINT("unsupported codec {}", pad_name.codec);
         return;
     }
 
@@ -114,10 +114,13 @@ auto jitsibin_pad_added_handler(GstElement* const /*jitsibin*/, GstPad* const pa
 auto jitsibin_pad_removed_handler(GstElement* const /*jitisbin*/, GstPad* const pad, gpointer const /*data*/) -> void {
     const auto name_g = AutoGString(gst_object_get_name(GST_OBJECT(pad)));
     const auto name   = std::string_view(name_g.get());
-    PRINT("pad removed name=", name);
+    PRINT("pad removed name={}", name);
 }
+} // namespace
 
-auto run() -> bool {
+auto main(int argc, char* argv[]) -> int {
+    gst_init(&argc, &argv);
+
     const auto pipeline = AutoGstObject(gst_pipeline_new(NULL));
     ensure(pipeline.get() != NULL);
 
@@ -150,10 +153,4 @@ auto run() -> bool {
                  NULL);
 
     return run_pipeline(pipeline.get());
-}
-} // namespace
-
-auto main(int argc, char* argv[]) -> int {
-    gst_init(&argc, &argv);
-    return run() ? 1 : 0;
 }
