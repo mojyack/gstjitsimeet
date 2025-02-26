@@ -16,6 +16,7 @@ enum class VideoCodecType {
     H264 = 1,
     Vp8,
     Vp9,
+    Av1,
 };
 
 auto audio_codec_type_table = make_pair_table<CodecType, AudioCodecType>({
@@ -26,6 +27,7 @@ auto video_codec_type_table = make_pair_table<CodecType, VideoCodecType>({
     {CodecType::H264, VideoCodecType::H264},
     {CodecType::Vp8, VideoCodecType::Vp8},
     {CodecType::Vp9, VideoCodecType::Vp9},
+    {CodecType::Av1, VideoCodecType::Av1},
 });
 
 auto audio_codec_type_get_type() -> GType {
@@ -54,6 +56,7 @@ auto video_codec_type_get_type() -> GType {
         GEnumValue{std::to_underlying(VideoCodecType::H264), "h264", "H.264"},
         GEnumValue{std::to_underlying(VideoCodecType::Vp8), "vp8", "VP8"},
         GEnumValue{std::to_underlying(VideoCodecType::Vp9), "vp9", "VP9"},
+        GEnumValue{std::to_underlying(VideoCodecType::Av1), "av1", "AV1"},
         GEnumValue{0, NULL, NULL},
     };
 
