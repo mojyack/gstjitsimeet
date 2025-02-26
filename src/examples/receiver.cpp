@@ -36,7 +36,7 @@ auto jitsibin_pad_added_handler(GstElement* const /*jitsibin*/, GstPad* const pa
         decoder = "avdec_h264";
     } else if(pad_name.codec == "VP8") {
         decoder = "avdec_vp8";
-    } else if(pad_name.codec == "VP9") {
+    } else if(pad_name.codec == "VP9" || pad_name.codec == "AV1") {
         decoder = "TODO";
     } else {
         PRINT("unsupported codec {}", pad_name.codec);

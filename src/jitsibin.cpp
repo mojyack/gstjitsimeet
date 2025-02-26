@@ -72,6 +72,7 @@ const auto codec_type_to_payloader_name = make_pair_table<CodecType, std::string
     {CodecType::H264, "rtph264pay"},
     {CodecType::Vp8, "rtpvp8pay"},
     {CodecType::Vp9, "rtpvp9pay"},
+    {CodecType::Av1, "rtpav1pay"},
 });
 
 const auto codec_type_to_depayloader_name = make_pair_table<CodecType, std::string_view>({
@@ -79,6 +80,7 @@ const auto codec_type_to_depayloader_name = make_pair_table<CodecType, std::stri
     {CodecType::H264, "rtph264depay"},
     {CodecType::Vp8, "rtpvp8depay"},
     {CodecType::Vp9, "rtpvp9depay"},
+    {CodecType::Av1, "rtpav1depay"},
 });
 
 const auto codec_type_to_rtp_encoding_name = make_pair_table<CodecType, std::string_view>({
@@ -86,6 +88,7 @@ const auto codec_type_to_rtp_encoding_name = make_pair_table<CodecType, std::str
     {CodecType::H264, "H264"},
     {CodecType::Vp8, "VP8"},
     {CodecType::Vp9, "VP9"},
+    {CodecType::Av1, "AV1"},
 });
 
 auto set_prop(GObject* obj, const guint id, const GValue* const value, GParamSpec* const spec) -> void {
@@ -134,7 +137,8 @@ auto rtpbin_request_pt_map_handler(GstElement* const /*rtpbin*/, const guint ses
             } break;
             case CodecType::H264:
             case CodecType::Vp8:
-            case CodecType::Vp9: {
+            case CodecType::Vp9:
+            case CodecType::Av1: {
                 gst_caps_set_simple(caps,
                                     "media", G_TYPE_STRING, "video",
                                     "encoding-name", G_TYPE_STRING, encoding_name.data(),
@@ -462,6 +466,7 @@ auto construct_sub_pipeline(RealSelf& self) -> bool {
         g_object_set(video_pay,
                      "picture-id-mode", 2, // 15-bit
                      NULL);
+    case CodecType::Av1:
         break;
     default:
         bail("codec type bug");
