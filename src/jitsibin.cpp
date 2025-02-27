@@ -46,6 +46,9 @@ struct RealSelf {
     coop::TaskHandle   ws_task;
     std::thread        runner_thread;
 
+    coop::AtomicEvent pipeline_ready;
+    bool              connection_aborted = false;
+
     Props props;
 
     // for unblocking setup
@@ -629,7 +632,7 @@ loop:
     goto loop;
 }
 
-auto connect_to_conference(RealSelf& self, coop::AtomicEvent& pipeline_ready) -> coop::Async<bool> {
+auto connect_to_conference(RealSelf& self) -> coop::Async<bool> {
     constexpr auto error_value = false;
 
     const auto& props = self.props;
@@ -701,7 +704,7 @@ auto connect_to_conference(RealSelf& self, coop::AtomicEvent& pipeline_ready) ->
         // if there are no participants in the conference, jicofo does not send session-initiate jingle.
         // temporary add fake sinks to pipeline in order to run pipeline immediately.
         co_ensure_v(setup_stub_pipeline(self));
-        pipeline_ready.notify();
+        self.pipeline_ready.notify();
     }
 
     co_await event;
@@ -747,7 +750,7 @@ auto connect_to_conference(RealSelf& self, coop::AtomicEvent& pipeline_ready) ->
         ASSERT(success, "failed to send accept iq");
     });
 
-    pipeline_ready.notify();
+    self.pipeline_ready.notify();
 
     auto ping_task = coop::TaskHandle();
     co_await coop::run_args(pinger_main(*conference)).detach({&ping_task});
@@ -759,22 +762,23 @@ auto connect_to_conference(RealSelf& self, coop::AtomicEvent& pipeline_ready) ->
 
 auto null_to_ready(RealSelf& self) -> bool {
     ensure(self.props.ensure_required_prop());
-    auto pipeline_ready = coop::AtomicEvent();
-    self.runner_thread  = std::thread([&self, &pipeline_ready]() {
-        self.runner.push_task(std::array{&self.connection_task}, [](RealSelf& self, coop::AtomicEvent& pipeline_ready) -> coop::Async<void> {
-            const auto success = co_await connect_to_conference(self, pipeline_ready);
+    self.runner_thread = std::thread([&self]() {
+        self.runner.push_task(std::array{&self.connection_task}, [](RealSelf& self) -> coop::Async<void> {
+            const auto success = co_await connect_to_conference(self);
             if(!success) {
                 LOG_WARN(logger, "failed to connect to conference");
+                self.connection_aborted = true;
+                self.pipeline_ready.notify();
             }
             const auto jitsibin = GST_JITSIBIN(self.bin);
             g_signal_emit(jitsibin, GST_JITSIBIN_GET_CLASS(jitsibin)->finished_signal, 0,
                           success ? TRUE : FALSE);
-        }(self, pipeline_ready));
+        }(self));
         self.runner.run();
     });
-    pipeline_ready.wait();
 
-    return true;
+    self.pipeline_ready.wait();
+    return !self.connection_aborted;
 }
 
 auto ready_to_null(RealSelf& self) -> bool {
