@@ -583,12 +583,18 @@ struct ConferenceCallbacks : public conference::ConferenceCallbacks {
         ensure(ws_context->send(payload));
     }
 
-    auto on_jingle_initiate(jingle::Jingle jingle) -> bool override {
-        return jingle_handler->on_initiate(std::move(jingle));
-    }
-
-    auto on_jingle_add_source(jingle::Jingle jingle) -> bool override {
-        return jingle_handler->on_add_source(std::move(jingle));
+    auto on_jingle(jingle::Jingle jingle) -> bool override {
+        switch(jingle.action) {
+        case jingle::Jingle::Action::SessionInitiate:
+            return jingle_handler->on_initiate(std::move(jingle));
+        case jingle::Jingle::Action::SourceAdd:
+            return jingle_handler->on_add_source(std::move(jingle));
+        case jingle::Jingle::Action::SessionTerminate:
+            ws_context->shutdown();
+            return true;
+        default:
+            bail("unimplemented jingle action {}", std::to_underlying(jingle.action));
+        }
     }
 
     auto on_participant_joined(const conference::Participant& participant) -> void override {
@@ -608,6 +614,20 @@ struct ConferenceCallbacks : public conference::ConferenceCallbacks {
                       new_muted ? TRUE : FALSE);
     }
 };
+
+auto pinger_main(conference::Conference& conference) -> coop::Async<void> {
+    static const auto iq = xmpp::elm::iq.clone()
+                               .append_attrs({
+                                   {"type", "get"},
+                               })
+                               .append_children({
+                                   xmpp::elm::ping,
+                               });
+loop:
+    conference.send_iq(iq, {});
+    co_await coop::sleep(std::chrono::seconds(10));
+    goto loop;
+}
 
 auto connect_to_conference(RealSelf& self, coop::AtomicEvent& pipeline_ready) -> coop::Async<bool> {
     constexpr auto error_value = false;
@@ -729,17 +749,10 @@ auto connect_to_conference(RealSelf& self, coop::AtomicEvent& pipeline_ready) ->
 
     pipeline_ready.notify();
 
-    const auto ping_iq = xmpp::elm::iq.clone()
-                             .append_attrs({
-                                 {"type", "get"},
-                             })
-                             .append_children({
-                                 xmpp::elm::ping,
-                             });
-loop:
-    co_await coop::sleep(std::chrono::seconds(10));
-    conference->send_iq(ping_iq, {});
-    goto loop;
+    auto ping_task = coop::TaskHandle();
+    co_await coop::run_args(pinger_main(*conference)).detach({&ping_task});
+    co_await ws_context.disconnected;
+    ping_task.cancel();
 
     co_return true;
 }
