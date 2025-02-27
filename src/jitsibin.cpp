@@ -761,7 +761,15 @@ auto null_to_ready(RealSelf& self) -> bool {
     ensure(self.props.ensure_required_prop());
     auto pipeline_ready = coop::AtomicEvent();
     self.runner_thread  = std::thread([&self, &pipeline_ready]() {
-        self.runner.push_task(std::array{&self.connection_task}, connect_to_conference(self, pipeline_ready));
+        self.runner.push_task(std::array{&self.connection_task}, [](RealSelf& self, coop::AtomicEvent& pipeline_ready) -> coop::Async<void> {
+            const auto success = co_await connect_to_conference(self, pipeline_ready);
+            if(!success) {
+                LOG_WARN(logger, "failed to connect to conference");
+            }
+            const auto jitsibin = GST_JITSIBIN(self.bin);
+            g_signal_emit(jitsibin, GST_JITSIBIN_GET_CLASS(jitsibin)->finished_signal, 0,
+                          success ? TRUE : FALSE);
+        }(self, pipeline_ready));
         self.runner.run();
     });
     pipeline_ready.wait();
@@ -846,6 +854,9 @@ auto gst_jitsibin_class_init(GstJitsiBinClass* klass) -> void {
     klass->mute_state_changed_signal = g_signal_new(
         "mute-state-changed", G_TYPE_FROM_CLASS(klass), G_SIGNAL_RUN_FIRST, 0, NULL, NULL, NULL, G_TYPE_NONE,
         3, G_TYPE_STRING, G_TYPE_BOOLEAN, G_TYPE_BOOLEAN);
+    klass->finished_signal = g_signal_new(
+        "finished", G_TYPE_FROM_CLASS(klass), G_SIGNAL_RUN_FIRST, 0, NULL, NULL, NULL, G_TYPE_NONE,
+        1, G_TYPE_BOOLEAN);
 
     parent_class = g_type_class_peek_parent(klass);
 

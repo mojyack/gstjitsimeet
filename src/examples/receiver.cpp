@@ -90,6 +90,13 @@ auto jitsibin_participant_left_handler(GstElement* const /*jitisbin*/, const gch
 auto jitsibin_mute_state_changed_handler(GstElement* const /*jitisbin*/, const gchar* const participant_id, const gboolean is_audio, const gboolean new_muted, gpointer const /*data*/) -> void {
     PRINT("mute state changed id={} {}={}", participant_id, is_audio ? "audio" : "video", new_muted);
 }
+
+auto jitsibin_finished_handler(GstElement* const /*jitisbin*/, const gboolean success, gpointer const data) -> void {
+    PRINT("finished success={}", success);
+    const auto& self = *std::bit_cast<Context*>(data);
+    const auto  bus  = AutoGstObject(gst_element_get_bus(self.pipeline));
+    ensure(gst_bus_post(bus.get(), gst_message_new_eos(NULL)) == TRUE);
+}
 } // namespace
 
 auto main(const int argc, const char* const* argv) -> int {
@@ -135,6 +142,7 @@ auto main(const int argc, const char* const* argv) -> int {
     g_signal_connect(&jitsibin, "participant-joined", G_CALLBACK(jitsibin_participant_joined_handler), &context);
     g_signal_connect(&jitsibin, "participant-left", G_CALLBACK(jitsibin_participant_left_handler), &context);
     g_signal_connect(&jitsibin, "mute-state-changed", G_CALLBACK(jitsibin_mute_state_changed_handler), &context);
+    g_signal_connect(&jitsibin, "finished", G_CALLBACK(jitsibin_finished_handler), &context);
 
     g_object_set(&waylandsink,
                  "async", FALSE,
