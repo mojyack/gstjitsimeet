@@ -844,6 +844,7 @@ auto gst_jitsibin_init(GstJitsiBin* jitsibin) -> void {
 
 auto gst_jitsibin_finalize(GObject* object) -> void {
     const auto jitsibin = GST_JITSIBIN(object);
+    ready_to_null(*jitsibin->real_self);
     delete jitsibin->real_self;
     G_OBJECT_CLASS(parent_class)->finalize(object);
 }
