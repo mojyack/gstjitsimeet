@@ -791,7 +791,9 @@ auto ready_to_null(RealSelf& self) -> bool {
         }(self));
         self.runner_thread.join();
     }
-    self.ws_context.shutdown();
+    if(self.ws_context.state == ws::client::State::Connected) {
+        self.ws_context.shutdown();
+    }
     return true;
 }
 
