@@ -44,7 +44,16 @@ net-libs/libwebsockets
 
 # Build
 ```
+# install dependent library
+git clone https://github.com/mojyack/coop.git
+pushd coop
+meson setup build --prefix=/tmp/rootfs
+ninja -C build install
+export PKG_CONFIG_PATH=/tmp/rootfs/lib/pkgconfig
+popd
+# build gstjitsimeet
 git clone --recursive https://github.com/mojyack/gstjitsimeet.git
+pushd gstjitsimeet
 meson setup build --buildtype=release
 ninja -C build
 ```
