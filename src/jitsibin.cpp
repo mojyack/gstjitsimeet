@@ -588,11 +588,11 @@ struct ConferenceCallbacks : public conference::ConferenceCallbacks {
 
     auto on_jingle(jingle::Jingle jingle) -> bool override {
         switch(jingle.action) {
-        case jingle::Jingle::Action::SessionInitiate:
+        case jingle::Action::SessionInitiate:
             return jingle_handler->on_initiate(std::move(jingle));
-        case jingle::Jingle::Action::SourceAdd:
+        case jingle::Action::SourceAdd:
             return jingle_handler->on_add_source(std::move(jingle));
-        case jingle::Jingle::Action::SessionTerminate:
+        case jingle::Action::SessionTerminate:
             ws_context->shutdown();
             return true;
         default:
@@ -735,7 +735,8 @@ auto connect_to_conference(RealSelf& self) -> coop::Async<bool> {
     }
 
     // send jingle accept
-    co_unwrap_v_mut(accept, self.jingle_handler->build_accept_jingle());
+    co_unwrap_v(accept, self.jingle_handler->build_accept_jingle());
+    co_unwrap_v_mut(accept_node, jingle::deparse(accept));
     const auto accept_iq = xmpp::elm::iq.clone()
                                .append_attrs({
                                    {"from", self.jid.as_full()},
@@ -743,7 +744,7 @@ auto connect_to_conference(RealSelf& self) -> coop::Async<bool> {
                                    {"type", "set"},
                                })
                                .append_children({
-                                   jingle::deparse(accept),
+                                   std::move(accept_node),
                                });
 
     conference->send_iq(std::move(accept_iq), [](bool success) -> void {
