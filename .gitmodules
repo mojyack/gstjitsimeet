@@ -1,6 +1,0 @@
-[submodule "submodules/libjitsimeet"]
-	path = submodules/libjitsimeet
-	url = https://github.com/mojyack/libjitsimeet.git
-[submodule "submodules/gstreamer-utils"]
-	path = submodules/gstreamer-utils
-	url = https://github.com/mojyack/gstreamer-utils.git

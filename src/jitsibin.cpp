@@ -28,7 +28,7 @@
 #include "props.hpp"
 
 #define CUTIL_MACROS_PRINT_FUNC(...) LOG_ERROR(logger, __VA_ARGS__)
-#include "macros/unwrap.hpp"
+#include "macros/coop-unwrap.hpp"
 
 #define gst_jitsibin_parent_class parent_class
 G_DEFINE_TYPE(GstJitsiBin, gst_jitsibin, GST_TYPE_BIN);
@@ -633,13 +633,11 @@ loop:
 }
 
 auto connect_to_conference(RealSelf& self) -> coop::Async<bool> {
-    constexpr auto error_value = false;
-
     const auto& props = self.props;
 
     const auto ws_path    = std::format("xmpp-websocket?room={}", props.room_name);
     auto&      ws_context = self.ws_context;
-    co_ensure_v(ws_context.init(
+    coop_ensure(ws_context.init(
         self.injector,
         {
             .address   = props.server_address.data(),
@@ -649,7 +647,7 @@ auto connect_to_conference(RealSelf& self) -> coop::Async<bool> {
             .ssl_level = props.secure ? ws::client::SSLLevel::Enable : ws::client::SSLLevel::TrustSelfSigned,
         }));
 
-    co_await coop::run_args(ws_context.process_until_finish()).detach({&self.ws_task});
+    self.runner.push_task(ws_context.process_until_finish(), &self.ws_task);
 
     auto event = coop::SingleEvent();
     // gain jid from server
@@ -703,21 +701,21 @@ auto connect_to_conference(RealSelf& self) -> coop::Async<bool> {
     if(props.async_sink) {
         // if there are no participants in the conference, jicofo does not send session-initiate jingle.
         // temporary add fake sinks to pipeline in order to run pipeline immediately.
-        co_ensure_v(setup_stub_pipeline(self));
+        coop_ensure(setup_stub_pipeline(self));
         self.pipeline_ready.notify();
     }
 
     co_await event;
 
     const auto colibri = colibri::Colibri::connect(self.jingle_handler->get_session().initiate_jingle, props.secure);
-    co_ensure_v(colibri.get() != nullptr);
+    coop_ensure(colibri.get() != nullptr);
     if(props.last_n >= 0) {
         colibri->set_last_n(props.last_n);
     }
 
     // create pipeline based on the jingle information
     LOG_DEBUG(logger, "creating pipeline");
-    co_ensure_v(construct_sub_pipeline(self));
+    coop_ensure(construct_sub_pipeline(self));
 
     // expose real pipeline
     if(props.async_sink) {
@@ -729,14 +727,14 @@ auto connect_to_conference(RealSelf& self) -> coop::Async<bool> {
         // link real sink to ghostpad
         for(const auto elements : {&self.audio_sink_elements, &self.video_sink_elements}) {
             const auto real_sink_pad = AutoGstObject(gst_element_get_static_pad(elements->real_sink, "sink"));
-            co_ensure_v(real_sink_pad.get() != NULL);
-            co_ensure_v(gst_ghost_pad_set_target(GST_GHOST_PAD(elements->sink_pad), real_sink_pad.get()) == TRUE);
+            coop_ensure(real_sink_pad.get() != NULL);
+            coop_ensure(gst_ghost_pad_set_target(GST_GHOST_PAD(elements->sink_pad), real_sink_pad.get()) == TRUE);
         }
     }
 
     // send jingle accept
-    co_unwrap_v(accept, self.jingle_handler->build_accept_jingle());
-    co_unwrap_v_mut(accept_node, jingle::deparse(accept));
+    coop_unwrap(accept, self.jingle_handler->build_accept_jingle());
+    coop_unwrap_mut(accept_node, jingle::deparse(accept));
     const auto accept_iq = xmpp::elm::iq.clone()
                                .append_attrs({
                                    {"from", self.jid.as_full()},
@@ -754,7 +752,7 @@ auto connect_to_conference(RealSelf& self) -> coop::Async<bool> {
     self.pipeline_ready.notify();
 
     auto ping_task = coop::TaskHandle();
-    co_await coop::run_args(pinger_main(*conference)).detach({&ping_task});
+    self.runner.push_task(pinger_main(*conference), &ping_task);
     co_await ws_context.disconnected;
     ping_task.cancel();
 
@@ -764,17 +762,19 @@ auto connect_to_conference(RealSelf& self) -> coop::Async<bool> {
 auto null_to_ready(RealSelf& self) -> bool {
     ensure(self.props.ensure_required_prop());
     self.runner_thread = std::thread([&self]() {
-        self.runner.push_task(std::array{&self.connection_task}, [](RealSelf& self) -> coop::Async<void> {
-            const auto success = co_await connect_to_conference(self);
-            if(!success) {
-                LOG_WARN(logger, "failed to connect to conference");
-                self.connection_aborted = true;
-                self.pipeline_ready.notify();
-            }
-            const auto jitsibin = GST_JITSIBIN(self.bin);
-            g_signal_emit(jitsibin, GST_JITSIBIN_GET_CLASS(jitsibin)->finished_signal, 0,
-                          success ? TRUE : FALSE);
-        }(self));
+        self.runner.push_task(
+            [](RealSelf& self) -> coop::Async<void> {
+                const auto success = co_await connect_to_conference(self);
+                if(!success) {
+                    LOG_WARN(logger, "failed to connect to conference");
+                    self.connection_aborted = true;
+                    self.pipeline_ready.notify();
+                }
+                const auto jitsibin = GST_JITSIBIN(self.bin);
+                g_signal_emit(jitsibin, GST_JITSIBIN_GET_CLASS(jitsibin)->finished_signal, 0,
+                              success ? TRUE : FALSE);
+            }(self),
+            &self.connection_task);
         self.runner.run();
     });
 
